@@ -1,4 +1,4 @@
-<!doctype html><html lang="uk"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>OBS Screen — Своя гра</title><link rel="stylesheet" href="/style.css?v=1613"><script src="/socket.io/socket.io.js"></script><script src="/common.js?v=1613"></script>
+<!doctype html><html lang="uk"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>OBS Screen — Своя гра</title><link rel="stylesheet" href="/style.css?v=1614"><script src="/socket.io/socket.io.js"></script><script src="/common.js?v=1613"></script>
 <style>
 /* v1.5.10 — larger question text for the stream/OBS view */
 #app .question{
@@ -72,6 +72,25 @@ body.screen .wrap{position:fixed;left:340px;right:24px;top:0;bottom:0;padding:12
 }
 #app .scorebar .player.active b,#app .scorebar .player.active .score,#app .scorebar .player.active .muted{color:#fff!important;text-shadow:none!important}
 @media(max-width:1200px){body.screen .wrap{left:300px}.cameraSafe{width:276px!important}}
+
+/* UI-03: Duo VS inside the established OBS four-part layout. */
+.duelStage{width:100%;max-width:100%;display:flex;flex-direction:column;align-items:center;gap:clamp(5px,.9vh,10px);margin:0 auto}
+.duelHeading{color:#ffd86b;font-weight:900;font-size:clamp(19px,2.4vw,33px);letter-spacing:.14em;line-height:1.05;text-shadow:0 0 20px rgba(255,208,93,.3)}
+.duelMatchup{display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);align-items:center;gap:clamp(6px,1.3vw,18px);width:min(100%,850px);margin:0 auto}
+.duelFighter{min-width:0;box-sizing:border-box;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;min-height:clamp(72px,10vh,112px);padding:clamp(7px,1.2vh,14px);border:2px solid #795aa7;border-radius:14px;background:linear-gradient(150deg,#332247,#251936);color:#fff;text-align:center;box-shadow:inset 0 1px 0 rgba(255,255,255,.06);transition:background .2s,border-color .2s,box-shadow .2s}
+.duelFighter-role{font-size:clamp(11px,.95vw,15px);font-weight:800;letter-spacing:.06em;color:#e4c8ff}
+.duelFighter-name{width:100%;font-size:clamp(17px,1.85vw,27px);line-height:1.12;font-weight:900;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#fff}
+.duelFighter-score{font-size:clamp(18px,2vw,27px);font-weight:900;line-height:1.06;color:#fff}
+.duelVersus{font-size:clamp(24px,3vw,44px);font-weight:1000;color:#ffd86b;line-height:1;text-shadow:0 0 20px rgba(255,204,80,.5)}
+.duelFighter.is-waiting{border-style:dashed;opacity:.8}
+.duelFighter.is-answering{background:linear-gradient(150deg,#665027,#453618)!important;border-color:#e4bd59!important;box-shadow:inset 0 0 24px rgba(242,192,73,.15),0 0 20px rgba(232,182,69,.35)!important}
+.duelFighter.is-answering .duelFighter-role,.duelFighter.is-answering .duelFighter-name,.duelFighter.is-answering .duelFighter-score{color:#fff!important}
+.duelFighter.voice-speaking{outline:3px solid #ad8bff;outline-offset:0;box-shadow:0 0 25px rgba(167,139,250,.4)}
+.duelFighter.is-answering.voice-speaking{outline:3px solid #ad8bff;outline-offset:0}
+.duelFighter.duelEntrance{animation:duelOpponentReveal .7s ease-out both}
+@keyframes duelOpponentReveal{0%{opacity:0;transform:translateX(15px) scale(.92)}70%{opacity:1;transform:translateX(-2px) scale(1.02)}100%{opacity:1;transform:translateX(0) scale(1)}}
+@media(prefers-reduced-motion:reduce){.duelFighter.duelEntrance{animation:none!important}}
+
 </style>
 <style>
 .seasonChampionStage{position:relative;overflow:hidden;isolation:isolate}.seasonChampionStage>*{position:relative;z-index:2}.seasonConfetti{position:absolute;inset:0;pointer-events:none;z-index:1;overflow:hidden}.seasonConfetti i{position:absolute;top:-12vh;width:10px;height:22px;border-radius:3px;background:hsl(var(--h),90%,60%);left:var(--x);animation:seasonConfettiFall var(--d) linear infinite;animation-delay:var(--delay);transform:rotate(var(--r))}.seasonConfetti .pop{top:auto;bottom:4%;width:12px;height:12px;border-radius:50%;animation:seasonPop 1.25s ease-out infinite;animation-delay:var(--delay)}.seasonCannon{position:absolute;bottom:2%;font-size:clamp(52px,6vw,88px);z-index:3;filter:drop-shadow(0 0 18px rgba(255,210,70,.45));animation:seasonCannonKick 1.25s ease-in-out infinite}.seasonCannon.left{left:2%;transform:rotate(25deg)}.seasonCannon.right{right:2%;transform:scaleX(-1) rotate(25deg)}@keyframes seasonConfettiFall{0%{transform:translateY(-10vh) rotate(0deg);opacity:0}10%{opacity:1}100%{transform:translateY(115vh) rotate(720deg);opacity:.9}}@keyframes seasonPop{0%{transform:translate(0,0) scale(.2);opacity:0}15%{opacity:1}100%{transform:translate(var(--dx),var(--dy)) scale(1);opacity:0}}@keyframes seasonCannonKick{0%,100%{margin-bottom:0}12%{margin-bottom:12px}24%{margin-bottom:0}}
@@ -323,8 +342,27 @@ function fitQuestionToOBS(){
   if(image)image.style.maxHeight=Math.max(90,available-panel.getBoundingClientRect().height+image.getBoundingClientRect().height-12)+'px';
  }
 }
+
+/* UI-03: VS panel uses actual duelPlayers ids, not player list order. */
+let lastDuelPairKey = null;
+function duelMatchupHTML(){
+ const ids=Array.isArray(state?.duelPlayers)?state.duelPlayers:[];
+ const p1=state.players.find(p=>p.id===(ids[0]||state.turnPlayerId));
+ const p2=ids[1]?state.players.find(p=>p.id===ids[1]):null;
+ const pairKey=ids.length===2?ids.join(':'):null;
+ const animateOpponent=!!pairKey&&pairKey!==lastDuelPairKey;
+ lastDuelPairKey=pairKey;
+ const answerer=GameUI.answererId(state),value=Number(state.current?.value||0);
+ const fighter=(p,role,second=false)=>{
+   const active=!!p&&p.id===answerer;
+   const classes=['duelFighter',!p?'is-waiting':'',active?'is-answering':'',second&&animateOpponent?'duelEntrance':''].filter(Boolean).join(' ');
+   const id=p?' data-player-id="'+GameUI.esc(p.id)+'"':'';
+   return '<div class="'+classes+'"'+id+'><div class="duelFighter-role">'+GameUI.esc(role)+'</div><div class="duelFighter-name">'+(p?GameUI.esc(p.name):'?')+'</div><div class="duelFighter-score">'+(p?GameUI.esc(p.score):'—')+'</div></div>';
+ };
+ return '<div class="duelStage"><div class="duelHeading">⚔️ ДУЕЛЬ'+(value?' • '+value+' БАЛІВ':'')+'</div><div class="duelMatchup">'+fighter(p1,'ВИКЛИК')+'<div class="duelVersus">VS</div>'+fighter(p2,p2?'СУПЕРНИК':'ОБИРАЄМО СУПЕРНИКА',true)+'</div></div>';
+}
 function applyAnswererHighlight(){const answerer=GameUI.answererId(state);app.querySelectorAll('.scorebar .player').forEach((card,i)=>card.classList.toggle('active',!!answerer&&state.players?.[i]?.id===answerer));}
-function applyVoiceHighlight(){const speaking=new Set(state?.voice?.speakingPlayerIds||[]);const cards=app.querySelectorAll('.scorebar .player');const players=state?.players||[];cards.forEach((card,i)=>card.classList.toggle('voice-speaking',speaking.has(players[i]?.id)));}
+function applyVoiceHighlight(){const speaking=new Set(state?.voice?.speakingPlayerIds||[]);const cards=app.querySelectorAll('.scorebar .player');const players=state?.players||[];cards.forEach((card,i)=>card.classList.toggle('voice-speaking',speaking.has(players[i]?.id)));app.querySelectorAll('.duelFighter[data-player-id]').forEach(card=>card.classList.toggle('voice-speaking',speaking.has(card.dataset.playerId)));}
 function render(){if(!state||!data)return;let h=``;
  if(state.phase==='paused'){
    app.innerHTML=`<div class="panel center" style="margin-top:8vh;padding:56px"><div class="huge">⏸</div><h1 style="font-size:54px">ТЕХНІЧНА ПАУЗА</h1><p class="muted" style="font-size:24px">Скоро продовжимо</p></div>`;
@@ -367,7 +405,7 @@ function render(){if(!state||!data)return;let h=``;
     const media=resultMedia||questionMedia;
     const answer=showingAnswer?`<div class="answer"><b>Правильна відповідь:</b> ${GameUI.esc(state.current?.a||'')}</div>`:state.phase==='answering'?`<div class="answer"><b>Відповідає:</b> ${GameUI.esc(state.players.find(p=>p.id===state.buzzer)?.name||'')}</div>`:'';
     h+=`<div class="obsGameLayout">
-      <div class="obsSegment obsSegmentQuestion panel"><div class="center"><b>${label}</b></div><div class="question">${GameUI.esc(state.current?.q||'')}</div></div>
+      <div class="obsSegment obsSegmentQuestion panel">${state.current?.type==='duel'?duelMatchupHTML():('<div class="center"><b>'+label+'</b></div>')}<div class="question">${GameUI.esc(state.current?.q||'')}</div></div>
       <div class="obsSegment obsSegmentMedia">${media}</div>
       <div class="obsSegment obsSegmentAnswer panel ${answer?'':'is-empty'}">${answer}</div>
       <div class="obsSegment obsSegmentPlayers">${GameUI.playersHTML(state.players,state.buzzer)}</div>
@@ -375,8 +413,8 @@ function render(){if(!state||!data)return;let h=``;
   }
  else if(state.phase==='va_bank_bet')h+=`<div class="panel center"><div class="huge">🎰</div><h1>ВА-БАНК!</h1><p>Гравець робить ставку</p></div>${GameUI.playersHTML(state.players)}`;
  else if(state.phase==='va_bank_question')h+=`<div class="panel center"><div class="huge">🎰 ВА-БАНК</div><h2>Ставка: ${state.vaBankBet}</h2><div class="question">${GameUI.esc(state.current?.q||'')}</div>${emojiQuestionHTML(state.current)}</div>${GameUI.playersHTML(state.players)}`;
- else if(state.phase==='duel_choose')h+=`<div class="panel center"><div class="huge">⚔️</div><h1>ДУЕЛЬ!</h1><p>Гравець обирає суперника</p></div>${GameUI.playersHTML(state.players)}`;
- else if(state.phase==='duel_question')h+=`<div class="panel center"><div class="huge">⚔️ ДУЕЛЬ</div><div class="question">${GameUI.esc(state.current?.q||'')}</div></div>${GameUI.playersHTML(state.players)}`;
+ else if(state.phase==='duel_choose')h+=`<div class="obsGameLayout"><div class="obsSegment obsSegmentQuestion panel">${duelMatchupHTML()}<div class="question">Очікуємо вибір суперника…</div></div><div class="obsSegment obsSegmentMedia"></div><div class="obsSegment obsSegmentAnswer panel is-empty"></div><div class="obsSegment obsSegmentPlayers">${GameUI.playersHTML(state.players)}</div></div>`;
+ else if(state.phase==='duel_question')h+=`<div class="obsGameLayout"><div class="obsSegment obsSegmentQuestion panel">${duelMatchupHTML()}<div class="question">${GameUI.esc(state.current?.q||'')}</div></div><div class="obsSegment obsSegmentMedia"></div><div class="obsSegment obsSegmentAnswer panel is-empty"></div><div class="obsSegment obsSegmentPlayers">${GameUI.playersHTML(state.players)}</div></div>`;
  else if(state.phase==='cat_choose')h+=`<div class="panel center"><div class="huge">🐈</div><h1>КІТ У МІШКУ</h1><p>Ведучий обирає гравця</p></div>${GameUI.playersHTML(state.players)}`;
  else if(state.phase==='final_bets')h+=`<div class="panel center"><div class="huge">ФІНАЛ</div><h2>Таємні ставки</h2></div>${GameUI.playersHTML(state.players)}`;
  else if(state.phase==='final_ready')h+=`<div class="panel"><div class="center"><div class="huge">ФІНАЛ</div><p class="muted">Таймер ще не запущено</p></div><div class="question">${GameUI.esc(state.current?.q||'')}</div></div>${GameUI.playersHTML(state.players)}`;
