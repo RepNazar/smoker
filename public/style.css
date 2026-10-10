@@ -32,3 +32,29 @@ body:before{content:'';position:fixed;inset:0;pointer-events:none;background:lin
 .buzz.waiting{background:linear-gradient(145deg,#332b45,#1b1726);color:#a9a1b8;border:2px solid #4d455d;box-shadow:none}
 .buzz.ready{background:linear-gradient(145deg,#a855f7,#6d28d9);color:#fff;border:2px solid #d8b4fe;box-shadow:0 0 34px rgba(168,85,247,.48),0 12px 35px rgba(109,40,217,.36)}
 .buzz.penalty{background:linear-gradient(145deg,#5a2633,#32151d);color:#ffd6dd;border:2px solid #fb7185;box-shadow:0 0 24px rgba(251,113,133,.18)}
+
+/* UI-01: one-second synchronized tile selection on HOST, PLAYER and OBS. */
+.tile.tile-selecting,.tile.tile-selecting:disabled,
+.mobileValues .phoneTile.tile-selecting:disabled{
+  opacity:1!important;border:2px solid #ffe27c!important;
+  color:#fff7db!important;background:linear-gradient(145deg,#b17c19,#694618)!important;
+  box-shadow:0 0 0 3px rgba(255,219,108,.45),0 0 36px rgba(255,205,72,.84),inset 0 0 26px rgba(255,238,160,.38)!important;
+  position:relative;z-index:1;animation:tileSelectionGlow 1s ease-in-out both;
+}
+@keyframes tileSelectionGlow{
+  0%{transform:scale(1);filter:brightness(1)}
+  34%{transform:scale(1.045);filter:brightness(1.38)}
+  70%{transform:scale(1.035);filter:brightness(1.22)}
+  100%{transform:scale(1.025);filter:brightness(1.1)}
+}
+/* UI-02: gold response card and WHITE name, network text, and score. */
+.scorebar .player.active,.scorebar .player.active.voice-speaking{
+  background:linear-gradient(150deg,#665027,#453618)!important;
+  color:#fff!important;border-color:#e4bd59!important;
+  box-shadow:inset 0 0 24px rgba(242,192,73,.15),0 0 22px rgba(232,182,69,.32)!important;
+  transition:background .18s ease,border-color .18s ease!important;
+}
+.scorebar .player.active b,.scorebar .player.active .score,.scorebar .player.active .muted{
+  color:#fff!important;text-shadow:none!important;
+}
+@media(prefers-reduced-motion:reduce){.tile.tile-selecting{animation:none!important;transform:none!important}}

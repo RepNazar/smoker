@@ -1,10 +1,11 @@
-<!doctype html><html lang="uk"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Ведучий — Своя гра</title><link rel="stylesheet" href="/style.css?v=306"><script src="/socket.io/socket.io.js"></script><script src="/common.js?v=306"></script><style>
+<!doctype html><html lang="uk"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Ведучий — Своя гра</title><link rel="stylesheet" href="/style.css?v=307"><script src="/socket.io/socket.io.js"></script><script src="/common.js?v=307"></script><style>
 .menuHero{display:flex;justify-content:space-between;align-items:center;margin-bottom:18px}
 .gameMenu{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:16px}
 .gameCard{appearance:none;text-align:left;border:1px solid #493b70;background:#171128;color:white;border-radius:18px;padding:20px;cursor:pointer;display:grid;grid-template-columns:auto 1fr auto;gap:14px;align-items:center}
 .gameCard:hover{outline:2px solid var(--accent2)}
 .gameIcon{font-size:40px}.gameCard h2{margin:0 0 6px}.gameCard p{margin:0}.gamePlay{font-weight:900;color:#d7c8ff}
 .scorebar .player.voice-speaking{border-color:#a879ff!important;box-shadow:0 0 0 2px #9b69ff,0 0 18px #9560ff!important;background:#38215f!important}
+.scorebar .player.active.voice-speaking{background:linear-gradient(150deg,#665027,#453618)!important;color:#fff!important;box-shadow:0 0 0 2px #9b69ff,0 0 18px #9560ff!important}
 .cueMixer{display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:center;margin:8px auto 14px;padding:10px 14px;border:1px solid #493b70;border-radius:12px;background:#201733;max-width:680px}.cueMixer label{display:flex;align-items:center;gap:9px;font-weight:700}.cueMixer input{width:125px;padding:0;border:0;accent-color:#9862fa}.cueMixer output{min-width:3ch;text-align:right;font-variant-numeric:tabular-nums}
 </style>
 <style>
@@ -202,11 +203,11 @@ function hostBoardHTML(){
  r.categories.forEach(c=>h+=`<div class="cat">${GameUI.esc(c.name)}</div>`);
  for(let qi=0;qi<5;qi++){
   r.categories.forEach((c,ci)=>{
-   const q=c.questions[qi], key=`${state.round}:${ci}:${qi}`, used=state.used[key];
+   const q=c.questions[qi], key=`${state.round}:${ci}:${qi}`, used=state.used[key],selected=state.selectedTile?.round===state.round&&state.selectedTile.ci===ci&&state.selectedTile.qi===qi;
    const special=hostSpecialCells[key];
    const mark=q.type==='triplet'?'🔥':special==='cat'?'🐈':special==='va_bank'?'🎰':special==='duel'?'⚔️':q.cat?'🐈':'';
    const title=q.type==='triplet'?'ТРИПЛЕТ':special==='cat'?'Кіт у мішку':special==='va_bank'?'ВА-БАНК':special==='duel'?'ДУЕЛЬ':q.cat?'Кіт у мішку':'';
-   h+=`<button class="tile ${used?'used':''}" data-ci="${ci}" data-qi="${qi}" ${used?'disabled':''} title="${title}"><span>${q.value}</span>${mark?` <span style="font-size:.55em;vertical-align:middle">${mark}</span>`:''}</button>`;
+   h+=`<button class="tile ${used?'used':''} ${selected?'tile-selecting':''}" data-ci="${ci}" data-qi="${qi}" ${(used||state.selectedTile)?'disabled':''} title="${title}"><span>${q.value}</span>${mark?` <span style="font-size:.55em;vertical-align:middle">${mark}</span>`:''}</button>`;
   });
  }
  return h+'</div>';
@@ -240,12 +241,13 @@ async function loadSeasonManagerArea(){
 }
 
 function hostPlayersHTML(players,buzzer){
+ const answerer=GameUI.answererId(state);
  return `<div class="scorebar">${(players||[]).map(p=>{
    const rtt=Number.isFinite(Number(p.networkRttMs))?Math.round(Number(p.networkRttMs)):null;
    const jitter=Number.isFinite(Number(p.networkJitterMs))?Math.round(Number(p.networkJitterMs)):null;
    const ready=!p.connected?'🔴 LOST':p.syncReady?'🟢 READY':'🟡 SYNC…';
    const net=rtt==null?'⚪ ping —':(rtt<80?'🟢':rtt<160?'🟡':'🔴')+' '+rtt+' ms'+(jitter==null?'':' • jitter '+jitter+' ms');
-   return `<div class="player ${p.id===buzzer?'active':''} ${state?.voice?.speakingPlayerIds?.includes(p.id)?'voice-speaking':''}" data-player-id="${GameUI.esc(p.id)}"><div><b>${GameUI.esc(p.name)}</b> ${p.connected?'🟢':'⚫'}</div><div class="muted player-network" style="font-size:12px;margin-top:4px">${ready} • ${net}</div><div class="score">${p.score}</div></div>`;
+   return `<div class="player ${p.id===answerer?'active':''} ${state?.voice?.speakingPlayerIds?.includes(p.id)?'voice-speaking':''}" data-player-id="${GameUI.esc(p.id)}"><div><b>${GameUI.esc(p.name)}</b> ${p.connected?'🟢':'⚫'}</div><div class="muted player-network" style="font-size:12px;margin-top:4px">${ready} • ${net}</div><div class="score">${p.score}</div></div>`;
  }).join('')}</div>`;
 }
 

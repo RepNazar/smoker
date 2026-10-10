@@ -1,4 +1,4 @@
-<!doctype html><html lang="uk"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>OBS Screen — Своя гра</title><link rel="stylesheet" href="/style.css?v=1612"><script src="/socket.io/socket.io.js"></script><script src="/common.js?v=1612"></script>
+<!doctype html><html lang="uk"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>OBS Screen — Своя гра</title><link rel="stylesheet" href="/style.css?v=1613"><script src="/socket.io/socket.io.js"></script><script src="/common.js?v=1613"></script>
 <style>
 /* v1.5.10 — larger question text for the stream/OBS view */
 #app .question{
@@ -65,6 +65,12 @@ body.screen .wrap{position:fixed;left:340px;right:24px;top:0;bottom:0;padding:12
 .obsSegmentPlayers .scorebar{width:100%;height:100%;margin:0!important;align-items:stretch}
 .obsSegmentPlayers .scorebar .player{display:flex;flex-direction:column;justify-content:center;box-sizing:border-box}
 .obsSegmentPlayers .scorebar .player.active{outline:none!important;box-shadow:inset 0 1px 0 rgba(255,255,255,.035)!important}
+#app .scorebar .player.active,#app .scorebar .player.active.voice-speaking{
+  background:linear-gradient(150deg,#665027,#453618)!important;
+  border-color:#e4bd59!important;color:#fff!important;
+  box-shadow:inset 0 0 24px rgba(242,192,73,.15),0 0 22px rgba(232,182,69,.32)!important;
+}
+#app .scorebar .player.active b,#app .scorebar .player.active .score,#app .scorebar .player.active .muted{color:#fff!important;text-shadow:none!important}
 @media(max-width:1200px){body.screen .wrap{left:300px}.cameraSafe{width:276px!important}}
 </style>
 <style>
@@ -317,6 +323,7 @@ function fitQuestionToOBS(){
   if(image)image.style.maxHeight=Math.max(90,available-panel.getBoundingClientRect().height+image.getBoundingClientRect().height-12)+'px';
  }
 }
+function applyAnswererHighlight(){const answerer=GameUI.answererId(state);app.querySelectorAll('.scorebar .player').forEach((card,i)=>card.classList.toggle('active',!!answerer&&state.players?.[i]?.id===answerer));}
 function applyVoiceHighlight(){const speaking=new Set(state?.voice?.speakingPlayerIds||[]);const cards=app.querySelectorAll('.scorebar .player');const players=state?.players||[];cards.forEach((card,i)=>card.classList.toggle('voice-speaking',speaking.has(players[i]?.id)));}
 function render(){if(!state||!data)return;let h=``;
  if(state.phase==='paused'){
@@ -388,5 +395,5 @@ function render(){if(!state||!data)return;let h=``;
      h+=`<div class="panel center"><div style="font-size:24px;letter-spacing:.18em;font-weight:800;opacity:.8">SMOKERLOL • ФІНАЛ</div>${!latest?`<div class="huge" style="margin-top:34px">🏆</div><h1 style="font-size:54px">ФІНАЛЬНІ РЕЗУЛЬТАТИ</h1><p class="muted" style="font-size:24px">Готуємо церемонію нагородження…</p>`:`<div style="margin-top:26px;font-size:34px;font-weight:900">${latest.place===1?'🏆 ПЕРЕМОЖЕЦЬ':latest.place+' МІСЦЕ'}</div><div class="winner" style="font-size:clamp(52px,7vw,92px);line-height:1.05;margin:12px 0 20px">${GameUI.esc(latest.p.name)}</div><div style="font-size:23px;opacity:.8">Фінальна відповідь</div><div class="answer" style="font-size:clamp(28px,3vw,44px);margin:10px auto;max-width:1000px">${GameUI.esc(latest.p.finalAnswer||'—')} ${latest.p.correct?'✅':'❌'}</div><div style="font-size:25px;margin-top:18px">${latest.p.beforeScore} ${latest.p.correct?'+':'−'} ${latest.p.bet} =</div><div class="huge" style="font-size:clamp(64px,8vw,110px);margin-top:4px">${latest.p.score}</div><div class="muted" style="font-size:22px">БАЛІВ</div>`}${revealed.length>1?`<div style="display:flex;gap:12px;justify-content:center;flex-wrap:wrap;margin-top:28px">${revealed.slice(0,-1).map(x=>`<div style="padding:10px 18px;border:1px solid rgba(255,255,255,.16);border-radius:14px;background:rgba(0,0,0,.18);font-size:19px"><b>${x.place}.</b> ${GameUI.esc(x.p.name)} — <b>${x.p.score}</b></div>`).join('')}</div>`:''}</div>`;
    }
  }
- const mediaSnapshot=captureMediaPlayback();stopDetachedMedia(mediaSnapshot);app.innerHTML=h;restoreMediaPlayback(mediaSnapshot);limitMediaPreview();syncObsMediaFromState();flushPendingObsMedia();applyVoiceHighlight();fitQuestionToOBS();armFirstTurnClock();armNumericClock();armAudienceClock()}
+ const mediaSnapshot=captureMediaPlayback();stopDetachedMedia(mediaSnapshot);app.innerHTML=h;restoreMediaPlayback(mediaSnapshot);limitMediaPreview();syncObsMediaFromState();flushPendingObsMedia();applyAnswererHighlight();applyVoiceHighlight();fitQuestionToOBS();armFirstTurnClock();armNumericClock();armAudienceClock()}
 </script></body></html>
