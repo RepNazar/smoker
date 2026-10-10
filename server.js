@@ -1083,6 +1083,8 @@ io.on('connection', socket => {
       } else {
         room.phase = 'buzz'; room.buzzCandidates=[]; if(room.buzzResolveTimer){clearTimeout(room.buzzResolveTimer);room.buzzResolveTimer=null;} room.buzzOpensAt=Date.now()+800;
         io.to(room.code).emit('buzzScheduled',{opensAt:room.buzzOpensAt});
+        const opensAt = room.buzzOpensAt; // RULE-04: play the same "buzz open" sound as the first opening
+        setTimeout(()=>{ if(rooms.get(room.code)===room && room.phase==='buzz' && !room.buzzer && room.buzzOpensAt===opensAt) io.to(room.code).emit('cue',{type:'buzz_open',at:opensAt}); },800);
       }
     }
     cb({ok:true}); emitState(room);
