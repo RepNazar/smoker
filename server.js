@@ -45,7 +45,7 @@ app.get('/host', (_, res) => res.sendFile(path.join(__dirname, 'public', 'host.h
 app.get('/play', (_, res) => res.sendFile(path.join(__dirname, 'public', 'play.html')));
 app.get('/audience', (_, res) => res.sendFile(path.join(__dirname, 'public', 'audience.html')));
 app.get('/audience/:code', (_, res) => res.sendFile(path.join(__dirname, 'public', 'audience.html')));
-app.get('/audience-qr/:code', async (req,res)=>{try{const c=String(req.params.code||'').toUpperCase();const base=`${req.protocol}://${req.get('host')}`;const svg=await QRCode.toString(`${base}/audience/${encodeURIComponent(c)}`,{type:'svg',margin:1,width:360,errorCorrectionLevel:'M'});res.type('image/svg+xml').send(svg)}catch(e){res.status(500).send('QR error')}});
+app.get('/audience-qr/:code', async (req,res)=>{try{const c=String(req.params.code||'').toUpperCase();const forwardProto=String(req.get('x-forwarded-proto')||'').split(',')[0].trim().toLowerCase();const safeProto=forwardProto==='https'?'https':req.protocol;const base=`${safeProto}://${req.get('host')}`;const svg=await QRCode.toString(`${base}/audience/${encodeURIComponent(c)}`,{type:'svg',margin:1,width:360,errorCorrectionLevel:'M'});res.type('image/svg+xml').send(svg)}catch(e){res.status(500).send('QR error')}});
 
 app.get('/questions.json', (_, res) => res.sendFile(path.join(__dirname, 'questions.json')));
 app.get('/games', (_, res) => res.json(gamesIndex.filter(g => g.enabled !== false).map(({file, ...g}) => g)));
