@@ -115,7 +115,10 @@ function publicState(room) {
         index: room.current.triplet.index,
         total: room.current.triplet.total,
         baseValue: room.current.triplet.baseValue,
-        answererId: room.current.triplet.answererId
+        answererId: room.current.triplet.answererId,
+        // UI-06: only value and judged outcomes; prompts and answers are never exposed.
+        steps: room.current.triplet.items.map(x=>Number(x.value)||0),
+        results: (room.current.triplet.results||[]).map(x=>({correct:!!x.correct,value:Number(x.value)||0}))
       } : undefined
     } : null,
     // Dedicated safe payload for PLAYER/OBS rendering of the currently active question.
@@ -877,7 +880,7 @@ io.on('connection', socket => {
       if(items.length<3) return cb({ok:false,error:'ТРИПЛЕТ має містити щонайменше 3 питання.'});
       const first=items[0];
       room.current.questionType='triplet';
-      room.current.triplet={index:0,total:items.length,baseValue:q.value,items:items.map(x=>({value:Number(x.value),q:String(x.q||''),a:String(x.a||'')})),answererId:room.turnPlayerId};
+      room.current.triplet={index:0,total:items.length,baseValue:q.value,items:items.map(x=>({value:Number(x.value),q:String(x.q||''),a:String(x.a||'')})),answererId:room.turnPlayerId,results:[]};
       room.current.value=Number(first.value); room.current.q=String(first.q||''); room.current.a=String(first.a||'');
       room.phase='triplet_question';
     } else if (q.type === 'numericClosest' && special === 'normal') {
@@ -1138,6 +1141,8 @@ io.on('connection', socket => {
     if(!t||!p) return cb({ok:false,error:'Гравця ТРИПЛЕТА не знайдено.'});
     const value=Number(room.current.value)||0;
     p.score += correct ? value : -value;
+    // UI-06: capture completed stages for the OBS progress display only.
+    t.results.push({correct:!!correct,value});
     room.revealAnswer=true; room.resultReason=correct?'triplet_correct':'triplet_wrong'; room.phase='triplet_result';
     cb({ok:true}); emitState(room);
   });
