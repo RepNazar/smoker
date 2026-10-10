@@ -1,4 +1,4 @@
-<!doctype html><html lang="uk"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>OBS Screen — Своя гра</title><link rel="stylesheet" href="/style.css?v=1615"><script src="/socket.io/socket.io.js"></script><script src="/common.js?v=1613"></script>
+<!doctype html><html lang="uk"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>OBS Screen — Своя гра</title><link rel="stylesheet" href="/style.css?v=1616"><script src="/socket.io/socket.io.js"></script><script src="/common.js?v=1613"></script>
 <style>
 /* v1.5.10 — larger question text for the stream/OBS view */
 #app .question{
@@ -95,6 +95,14 @@ body.screen .wrap{position:fixed;left:340px;right:24px;top:0;bottom:0;padding:12
 /* UI-04: show the chosen Cat in the Bag answerer above the question in OBS. */
 .catAnswererLabel{display:flex;justify-content:center;align-items:center;flex-wrap:wrap;gap:clamp(5px,.8vw,12px);max-width:100%;text-align:center;margin:clamp(3px,.7vh,8px) auto 0;padding:clamp(6px,.8vh,10px) clamp(12px,1.6vw,22px);border:1px solid rgba(255,215,111,.56);border-radius:12px;background:rgba(255,204,84,.12);color:#fff;font-size:clamp(18px,1.8vw,29px);line-height:1.17;font-weight:800}
 .catAnswererLabel b{color:#fff;font-size:1.12em;overflow-wrap:anywhere}
+
+/* UI-05: compact VA-BANK speaker and wager in OBS without changing four segments. */
+.vaBankStage{display:flex;flex-direction:column;align-items:center;gap:clamp(5px,.8vh,10px);width:100%;max-width:100%;margin:0 auto}
+.vaBankHeading{color:#ffd86b;font-size:clamp(22px,2.3vw,34px);font-weight:900;letter-spacing:.1em;line-height:1.12;text-shadow:0 0 16px rgba(255,210,75,.24)}
+.vaBankInfo{display:flex;flex-direction:column;align-items:center;gap:4px;width:min(100%,760px);max-width:100%;box-sizing:border-box;padding:clamp(8px,1vh,12px) clamp(12px,1.5vw,22px);border:1px solid rgba(255,215,111,.62);border-radius:14px;background:linear-gradient(150deg,rgba(115,83,34,.55),rgba(67,48,23,.56));text-align:center;overflow-wrap:anywhere}
+.vaBankAnswerer{color:#fff;line-height:1.2;font-size:clamp(18px,1.8vw,29px);font-weight:800}
+.vaBankAnswerer b{color:#fff;font-size:1.08em}
+.vaBankStake{color:#ffdc79;font-size:clamp(16px,1.55vw,24px);line-height:1.2;font-weight:900}
 </style>
 <style>
 .seasonChampionStage{position:relative;overflow:hidden;isolation:isolate}.seasonChampionStage>*{position:relative;z-index:2}.seasonConfetti{position:absolute;inset:0;pointer-events:none;z-index:1;overflow:hidden}.seasonConfetti i{position:absolute;top:-12vh;width:10px;height:22px;border-radius:3px;background:hsl(var(--h),90%,60%);left:var(--x);animation:seasonConfettiFall var(--d) linear infinite;animation-delay:var(--delay);transform:rotate(var(--r))}.seasonConfetti .pop{top:auto;bottom:4%;width:12px;height:12px;border-radius:50%;animation:seasonPop 1.25s ease-out infinite;animation-delay:var(--delay)}.seasonCannon{position:absolute;bottom:2%;font-size:clamp(52px,6vw,88px);z-index:3;filter:drop-shadow(0 0 18px rgba(255,210,70,.45));animation:seasonCannonKick 1.25s ease-in-out infinite}.seasonCannon.left{left:2%;transform:rotate(25deg)}.seasonCannon.right{right:2%;transform:scaleX(-1) rotate(25deg)}@keyframes seasonConfettiFall{0%{transform:translateY(-10vh) rotate(0deg);opacity:0}10%{opacity:1}100%{transform:translateY(115vh) rotate(720deg);opacity:.9}}@keyframes seasonPop{0%{transform:translate(0,0) scale(.2);opacity:0}15%{opacity:1}100%{transform:translate(var(--dx),var(--dy)) scale(1);opacity:0}}@keyframes seasonCannonKick{0%,100%{margin-bottom:0}12%{margin-bottom:12px}24%{margin-bottom:0}}
@@ -365,7 +373,21 @@ function duelMatchupHTML(){
  };
  return '<div class="duelStage"><div class="duelHeading">⚔️ ДУЕЛЬ'+(value?' • '+value+' БАЛІВ':'')+'</div><div class="duelMatchup">'+fighter(p1,'ВИКЛИК')+'<div class="duelVersus">VS</div>'+fighter(p2,p2?'СУПЕРНИК':'ОБИРАЄМО СУПЕРНИКА',true)+'</div></div>';
 }
-function applyAnswererHighlight(){const answerer=GameUI.answererId(state);app.querySelectorAll('.scorebar .player').forEach((card,i)=>card.classList.toggle('active',!!answerer&&state.players?.[i]?.id===answerer));}
+
+/* UI-05: present the actual VA-BANK answerer, including wager and result. */
+function vaBankHeaderHTML(){
+ const player=state?.players?.find(p=>p.id===state.vaBankPlayer);
+ const betValue=state?.vaBankBet;
+ const hasBet=betValue!==null&&betValue!==undefined&&Number.isFinite(Number(betValue));
+ const name=player?GameUI.esc(player.name):'—';
+ const wager=hasBet?'СТАВКА: '+GameUI.esc(String(betValue))+' БАЛІВ':'ГОТУЄ СТАВКУ';
+ return '<div class="vaBankStage"><div class="vaBankHeading">🎰 ВА-БАНК</div><div class="vaBankInfo"><div class="vaBankAnswerer">ВІДПОВІДАЄ: <b>'+name+'</b></div><div class="vaBankStake">'+wager+'</div></div></div>';
+}
+function applyAnswererHighlight(){
+ const vaBankCurrent=state?.current?.type==='va_bank'&&['va_bank_bet','va_bank_question','result'].includes(state.phase);
+ const answerer=vaBankCurrent?state.vaBankPlayer:GameUI.answererId(state);
+ app.querySelectorAll('.scorebar .player').forEach((card,i)=>card.classList.toggle('active',!!answerer&&state.players?.[i]?.id===answerer));
+}
 function applyVoiceHighlight(){const speaking=new Set(state?.voice?.speakingPlayerIds||[]);const cards=app.querySelectorAll('.scorebar .player');const players=state?.players||[];cards.forEach((card,i)=>card.classList.toggle('voice-speaking',speaking.has(players[i]?.id)));app.querySelectorAll('.duelFighter[data-player-id]').forEach(card=>card.classList.toggle('voice-speaking',speaking.has(card.dataset.playerId)));}
 function render(){if(!state||!data)return;let h=``;
  if(state.phase==='paused'){
@@ -413,14 +435,14 @@ function render(){if(!state||!data)return;let h=``;
     const media=resultMedia||questionMedia;
     const answer=showingAnswer?`<div class="answer"><b>Правильна відповідь:</b> ${GameUI.esc(state.current?.a||'')}</div>`:state.phase==='answering'?`<div class="answer"><b>Відповідає:</b> ${GameUI.esc(state.players.find(p=>p.id===state.buzzer)?.name||'')}</div>`:'';
     h+=`<div class="obsGameLayout">
-      <div class="obsSegment obsSegmentQuestion panel">${state.current?.type==='duel'?duelMatchupHTML():('<div class="center"><b>'+label+'</b></div>'+catAnswererLabel)}<div class="question">${GameUI.esc(state.current?.q||'')}</div></div>
+      <div class="obsSegment obsSegmentQuestion panel">${state.current?.type==='duel'?duelMatchupHTML():state.current?.type==='va_bank'?vaBankHeaderHTML():('<div class="center"><b>'+label+'</b></div>'+catAnswererLabel)}<div class="question">${GameUI.esc(state.current?.q||'')}</div></div>
       <div class="obsSegment obsSegmentMedia">${media}</div>
       <div class="obsSegment obsSegmentAnswer panel ${answer?'':'is-empty'}">${answer}</div>
       <div class="obsSegment obsSegmentPlayers">${GameUI.playersHTML(state.players,state.buzzer)}</div>
     </div>`;
   }
- else if(state.phase==='va_bank_bet')h+=`<div class="panel center"><div class="huge">🎰</div><h1>ВА-БАНК!</h1><p>Гравець робить ставку</p></div>${GameUI.playersHTML(state.players)}`;
- else if(state.phase==='va_bank_question')h+=`<div class="panel center"><div class="huge">🎰 ВА-БАНК</div><h2>Ставка: ${state.vaBankBet}</h2><div class="question">${GameUI.esc(state.current?.q||'')}</div>${emojiQuestionHTML(state.current)}</div>${GameUI.playersHTML(state.players)}`;
+ else if(state.phase==='va_bank_bet')h+=`<div class="obsGameLayout"><div class="obsSegment obsSegmentQuestion panel">${vaBankHeaderHTML()}</div><div class="obsSegment obsSegmentMedia"></div><div class="obsSegment obsSegmentAnswer panel is-empty"></div><div class="obsSegment obsSegmentPlayers">${GameUI.playersHTML(state.players)}</div></div>`;
+ else if(state.phase==='va_bank_question')h+=`<div class="obsGameLayout"><div class="obsSegment obsSegmentQuestion panel">${vaBankHeaderHTML()}<div class="question">${GameUI.esc(state.current?.q||'')}</div>${emojiQuestionHTML(state.current)}</div><div class="obsSegment obsSegmentMedia"></div><div class="obsSegment obsSegmentAnswer panel is-empty"></div><div class="obsSegment obsSegmentPlayers">${GameUI.playersHTML(state.players)}</div></div>`;
  else if(state.phase==='duel_choose')h+=`<div class="obsGameLayout"><div class="obsSegment obsSegmentQuestion panel">${duelMatchupHTML()}<div class="question">Очікуємо вибір суперника…</div></div><div class="obsSegment obsSegmentMedia"></div><div class="obsSegment obsSegmentAnswer panel is-empty"></div><div class="obsSegment obsSegmentPlayers">${GameUI.playersHTML(state.players)}</div></div>`;
  else if(state.phase==='duel_question')h+=`<div class="obsGameLayout"><div class="obsSegment obsSegmentQuestion panel">${duelMatchupHTML()}<div class="question">${GameUI.esc(state.current?.q||'')}</div></div><div class="obsSegment obsSegmentMedia"></div><div class="obsSegment obsSegmentAnswer panel is-empty"></div><div class="obsSegment obsSegmentPlayers">${GameUI.playersHTML(state.players)}</div></div>`;
  else if(state.phase==='cat_choose')h+=`<div class="panel center"><div class="huge">🐈</div><h1>КІТ У МІШКУ</h1><p>Ведучий обирає гравця</p></div>${GameUI.playersHTML(state.players)}`;
