@@ -1,4 +1,4 @@
-<!doctype html><html lang="uk"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>OBS Screen — Своя гра</title><link rel="stylesheet" href="/style.css?v=1614"><script src="/socket.io/socket.io.js"></script><script src="/common.js?v=1613"></script>
+<!doctype html><html lang="uk"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>OBS Screen — Своя гра</title><link rel="stylesheet" href="/style.css?v=1615"><script src="/socket.io/socket.io.js"></script><script src="/common.js?v=1613"></script>
 <style>
 /* v1.5.10 — larger question text for the stream/OBS view */
 #app .question{
@@ -91,6 +91,10 @@ body.screen .wrap{position:fixed;left:340px;right:24px;top:0;bottom:0;padding:12
 @keyframes duelOpponentReveal{0%{opacity:0;transform:translateX(15px) scale(.92)}70%{opacity:1;transform:translateX(-2px) scale(1.02)}100%{opacity:1;transform:translateX(0) scale(1)}}
 @media(prefers-reduced-motion:reduce){.duelFighter.duelEntrance{animation:none!important}}
 
+
+/* UI-04: show the chosen Cat in the Bag answerer above the question in OBS. */
+.catAnswererLabel{display:flex;justify-content:center;align-items:center;flex-wrap:wrap;gap:clamp(5px,.8vw,12px);max-width:100%;text-align:center;margin:clamp(3px,.7vh,8px) auto 0;padding:clamp(6px,.8vh,10px) clamp(12px,1.6vw,22px);border:1px solid rgba(255,215,111,.56);border-radius:12px;background:rgba(255,204,84,.12);color:#fff;font-size:clamp(18px,1.8vw,29px);line-height:1.17;font-weight:800}
+.catAnswererLabel b{color:#fff;font-size:1.12em;overflow-wrap:anywhere}
 </style>
 <style>
 .seasonChampionStage{position:relative;overflow:hidden;isolation:isolate}.seasonChampionStage>*{position:relative;z-index:2}.seasonConfetti{position:absolute;inset:0;pointer-events:none;z-index:1;overflow:hidden}.seasonConfetti i{position:absolute;top:-12vh;width:10px;height:22px;border-radius:3px;background:hsl(var(--h),90%,60%);left:var(--x);animation:seasonConfettiFall var(--d) linear infinite;animation-delay:var(--delay);transform:rotate(var(--r))}.seasonConfetti .pop{top:auto;bottom:4%;width:12px;height:12px;border-radius:50%;animation:seasonPop 1.25s ease-out infinite;animation-delay:var(--delay)}.seasonCannon{position:absolute;bottom:2%;font-size:clamp(52px,6vw,88px);z-index:3;filter:drop-shadow(0 0 18px rgba(255,210,70,.45));animation:seasonCannonKick 1.25s ease-in-out infinite}.seasonCannon.left{left:2%;transform:rotate(25deg)}.seasonCannon.right{right:2%;transform:scaleX(-1) rotate(25deg)}@keyframes seasonConfettiFall{0%{transform:translateY(-10vh) rotate(0deg);opacity:0}10%{opacity:1}100%{transform:translateY(115vh) rotate(720deg);opacity:.9}}@keyframes seasonPop{0%{transform:translate(0,0) scale(.2);opacity:0}15%{opacity:1}100%{transform:translate(var(--dx),var(--dy)) scale(1);opacity:0}}@keyframes seasonCannonKick{0%,100%{margin-bottom:0}12%{margin-bottom:12px}24%{margin-bottom:0}}
@@ -398,6 +402,10 @@ function render(){if(!state||!data)return;let h=``;
  else if(['triplet_question','triplet_result'].includes(state.phase)){const t=state.current?.triplet||{},p=state.players.find(x=>x.id===t.answererId),show=state.phase==='triplet_result'&&state.revealAnswer;h+=`<div class="obsGameLayout"><div class="obsSegment obsSegmentQuestion panel"><div class="center"><b>🔥 ТРИПЛЕТ • ${Number(t.index||0)+1}/${t.total||3} • ${state.current?.value||0} БАЛІВ</b><div class="muted" style="margin-top:8px">Відповідає: ${GameUI.esc(p?.name||'—')}</div></div><div class="question">${GameUI.esc(state.current?.q||'')}</div></div><div class="obsSegment obsSegmentMedia"></div><div class="obsSegment obsSegmentAnswer panel ${show?'':'is-empty'}">${show?`<div class="answer"><b>Правильна відповідь:</b> ${GameUI.esc(state.current?.a||'')}</div>`:''}</div><div class="obsSegment obsSegmentPlayers">${GameUI.playersHTML(state.players,t.answererId)}</div></div>`;}
  else if(['question','buzz','answering','cat_question','result','video_result'].includes(state.phase)){
     const label=state.current?.type==='cat'?'🐈 КІТ У МІШКУ':'';
+    const catAnswerer=state.current?.type==='cat'&&state.catReceiver
+      ? state.players.find(p=>p.id===state.catReceiver) : null;
+    const catAnswererLabel=catAnswerer
+      ? `<div class="catAnswererLabel">ВІДПОВІДАЄ: <b>${GameUI.esc(catAnswerer.name)}</b></div>` : '';
     const showingAnswer=['result','video_result'].includes(state.phase)&&state.revealAnswer;
     const questionMedia=emojiQuestionHTML(state.current)+imageRevealHTML(state.current,false)+mediaQuestionHTML(state.current,false);
     const resultMedia=showingAnswer?answerMediaHTML(state.current):'';
@@ -405,7 +413,7 @@ function render(){if(!state||!data)return;let h=``;
     const media=resultMedia||questionMedia;
     const answer=showingAnswer?`<div class="answer"><b>Правильна відповідь:</b> ${GameUI.esc(state.current?.a||'')}</div>`:state.phase==='answering'?`<div class="answer"><b>Відповідає:</b> ${GameUI.esc(state.players.find(p=>p.id===state.buzzer)?.name||'')}</div>`:'';
     h+=`<div class="obsGameLayout">
-      <div class="obsSegment obsSegmentQuestion panel">${state.current?.type==='duel'?duelMatchupHTML():('<div class="center"><b>'+label+'</b></div>')}<div class="question">${GameUI.esc(state.current?.q||'')}</div></div>
+      <div class="obsSegment obsSegmentQuestion panel">${state.current?.type==='duel'?duelMatchupHTML():('<div class="center"><b>'+label+'</b></div>'+catAnswererLabel)}<div class="question">${GameUI.esc(state.current?.q||'')}</div></div>
       <div class="obsSegment obsSegmentMedia">${media}</div>
       <div class="obsSegment obsSegmentAnswer panel ${answer?'':'is-empty'}">${answer}</div>
       <div class="obsSegment obsSegmentPlayers">${GameUI.playersHTML(state.players,state.buzzer)}</div>
