@@ -692,7 +692,8 @@ io.on('connection', socket => {
     }
     if (Object.prototype.hasOwnProperty.call(room.firstTurnAnswers,p.id))
       return cb({ok:false,error:'Відповідь уже зафіксована.'});
-    const n = Math.round(Number(answer));
+    const numericText = String(answer ?? '').trim();
+    const n = /^\d+$/.test(numericText) ? Number(numericText) : NaN;
     if (!Number.isFinite(n) || n < 0 || n > 1000000000)
       return cb({ok:false,error:'Введіть коректне невід’ємне число.'});
 
@@ -910,7 +911,9 @@ io.on('connection', socket => {
     if(!room||!p||room.phase!=='numeric_question'||!room.numericChallenge) return cb({ok:false,error:'Числове питання зараз неактивне.'});
     if(!room.numericEndsAt||Date.now()>room.numericEndsAt) return cb({ok:false,error:'Час вийшов.'});
     if(Object.prototype.hasOwnProperty.call(room.numericAnswers,p.id)) return cb({ok:false,error:'Відповідь уже зафіксована.'});
-    const n=Number(answer); if(!Number.isFinite(n)) return cb({ok:false,error:'Введіть число.'});
+    const numericText=String(answer??'').trim();
+    const n=/^-?(?:\d+(?:[.,]\d+)?|[.,]\d+)$/.test(numericText)?Number(numericText.replace(',','.')):NaN;
+    if(!Number.isFinite(n)) return cb({ok:false,error:'Введіть коректне число без літер.'});
     room.numericAnswers[p.id]=n; room.numericSubmittedAt[p.id]=Date.now(); cb({ok:true}); emitState(room);
   });
 

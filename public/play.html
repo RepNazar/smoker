@@ -392,6 +392,41 @@ function playerImageRevealHTML(cur){
  </div>`;
 }
 
+
+/* Only ordinary decimal notation is accepted: no letters, 'e' exponent or other formats. */
+function parseQuizNumber(raw,integerOnly=false){
+ const value=String(raw??'').trim();
+ if(integerOnly){
+  if(!/^\d+$/.test(value))return null;
+ }else if(!/^-?(?:\d+(?:[.,]\d+)?|[.,]\d+)$/.test(value)){
+  return null;
+ }
+ const number=Number(value.replace(',','.'));
+ return Number.isFinite(number)?number:null;
+}
+function bindQuizNumberInput(id,integerOnly=false){
+ const input=document.getElementById(id);
+ if(!input)return;
+ const allowed=integerOnly?/^\d*$/:/^-?(?:\d*(?:[.,]\d*)?)?$/;
+ let lastValid=input.value;
+ input.addEventListener('beforeinput',event=>{
+  if(event.isComposing||!event.inputType?.startsWith('insert')||event.data===null)return;
+  const start=input.selectionStart??input.value.length,end=input.selectionEnd??start;
+  const next=input.value.slice(0,start)+event.data+input.value.slice(end);
+  if(!allowed.test(next))event.preventDefault();
+ });
+ input.addEventListener('paste',event=>{
+  const value=event.clipboardData?.getData('text');
+  if(value===undefined)return;
+  const start=input.selectionStart??input.value.length,end=input.selectionEnd??start;
+  const next=input.value.slice(0,start)+value+input.value.slice(end);
+  if(!allowed.test(next))event.preventDefault();
+ });
+ input.addEventListener('input',()=>{
+  if(allowed.test(input.value))lastValid=input.value;
+  else input.value=lastValid;
+ });
+}
 let numericClockHandle=null;
 function armNumericClock(){if(numericClockHandle){clearInterval(numericClockHandle);numericClockHandle=null}const el=document.getElementById('numericTimer'),remaining=Number(state?.numericChallenge?.remainingMs||0);if(!el||remaining<=0)return;const end=Date.now()+remaining;const tick=()=>{const left=Math.max(0,Math.ceil((end-Date.now())/1000));el.textContent=left;if(left<=0){clearInterval(numericClockHandle);numericClockHandle=null}};tick();numericClockHandle=setInterval(tick,200)}
 function render(){
@@ -413,12 +448,12 @@ function render(){
     } else if(status==='expired'){
       h+=`<div class="center"><div class="huge">0</div><h2>⏱ Час вийшов</h2><p class="muted">Відповідь не була зафіксована.</p></div>`;
     } else {
-      h+=`<div class="center"><div class="huge"><span id="firstTurnTimer">${Math.max(0,Math.ceil(Number(q.remainingMs||0)/1000))}</span></div><h2>Розіграш першого ходу</h2></div><div class="question" style="font-size:1.2rem">${GameUI.esc(q.question||'')}</div><input id="firstTurnAnswer" type="number" min="0" step="1" inputmode="numeric" placeholder="Введіть число" autocomplete="off"><br><br><button id="sendFirstTurn" class="btn gold">Підтвердити відповідь</button>`;
+      h+=`<div class="center"><div class="huge"><span id="firstTurnTimer">${Math.max(0,Math.ceil(Number(q.remainingMs||0)/1000))}</span></div><h2>Розіграш першого ходу</h2></div><div class="question" style="font-size:1.2rem">${GameUI.esc(q.question||'')}</div><input id="firstTurnAnswer" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="10" placeholder="Введіть число" autocomplete="off" spellcheck="false"><br><br><button id="sendFirstTurn" class="btn gold">Підтвердити відповідь</button>`;
     }
   }
   else if(state.phase==='first_turn_result'){const pos=(state.firstTurnQuiz?.results||[]).findIndex(x=>x.id===playerId);h+=`<div class="center"><div class="huge">${pos>=0?pos+1:'—'}</div><h2>Ваш порядок вибору</h2><p class="muted">Чекаємо початку 1 раунду.</p></div>`}
   else if(state.phase==='numeric_ready'){const n=state.numericChallenge||{};h+=`<div class="center"><div class="huge">🔢 30</div><h2>Числове питання • ${n.value} балів</h2></div><div class="question" style="font-size:1.2rem">${GameUI.esc(n.question||'')}</div><div class="center"><h2>⏳ Чекаємо старту ведучого</h2><p class="muted">Після старту матимеш рівно 30 секунд.</p></div>`}
-  else if(state.phase==='numeric_question'){const n=state.numericChallenge||{},sub=n.submittedPlayerIds||[],done=sub.includes(playerId),left=Math.max(0,Math.ceil(Number(n.remainingMs||0)/1000));h+=`<div class="center"><div class="huge">🔢 <span id="numericTimer">${left}</span></div><h2>Числове питання • ${n.value} балів</h2></div><div class="question" style="font-size:1.2rem">${GameUI.esc(n.question||'')}</div>${done?'<div class="center"><h2>Відповідь зафіксовано ✅</h2><p class="muted">Змінити її вже не можна.</p></div>':left>0?'<input id="numericAnswer" type="number" step="any" inputmode="decimal" placeholder="Введіть число" autocomplete="off"><br><br><button id="sendNumeric" class="btn gold">Підтвердити відповідь</button>':'<div class="center"><h2>⏱ Час вийшов</h2></div>'}`}
+  else if(state.phase==='numeric_question'){const n=state.numericChallenge||{},sub=n.submittedPlayerIds||[],done=sub.includes(playerId),left=Math.max(0,Math.ceil(Number(n.remainingMs||0)/1000));h+=`<div class="center"><div class="huge">🔢 <span id="numericTimer">${left}</span></div><h2>Числове питання • ${n.value} балів</h2></div><div class="question" style="font-size:1.2rem">${GameUI.esc(n.question||'')}</div>${done?'<div class="center"><h2>Відповідь зафіксовано ✅</h2><p class="muted">Змінити її вже не можна.</p></div>':left>0?'<input id="numericAnswer" type="text" inputmode="decimal" maxlength="24" placeholder="Введіть число" autocomplete="off" spellcheck="false"><br><br><button id="sendNumeric" class="btn gold">Підтвердити відповідь</button>':'<div class="center"><h2>⏱ Час вийшов</h2></div>'}`}
   else if(state.phase==='numeric_result'){const n=state.numericChallenge||{},pos=(n.results||[]).findIndex(x=>x.id===playerId);h+=`<div class="center"><div class="huge">${pos>=0?pos+1:'—'}</div><h2>Ваше місце</h2><p class="muted">Правильна відповідь: ${GameUI.esc(String(n.correctAnswer??''))}</p></div>`}
   else if(state.phase==='board'){
     const chooser=state.players.find(x=>x.id===state.turnPlayerId);
@@ -464,12 +499,20 @@ function render(){
   armPenaltyClock();
   armBuzzClock();
   document.getElementById('leaveRoom').onclick=leaveRoom;
+  bindQuizNumberInput('firstTurnAnswer',true);
+  bindQuizNumberInput('numericAnswer');
   if(document.getElementById('buzz'))document.getElementById('buzz').onpointerdown=()=>{
     socket.emit('buzz',{code,pressedAtServerTime:serverNow()},r=>{if(r?.falseStart){const p=me();if(p){p.falseStartUntil=Number(r.until||0);p.falseStartRemainingMs=3000;penaltySourceUntil=0;}render()}});
   };
-  if(document.getElementById('sendNumeric'))document.getElementById('sendNumeric').onclick=()=>{const answer=document.getElementById('numericAnswer').value;socket.emit('submitNumericAnswer',{code,answer},r=>{if(!r?.ok)alert(r?.error||'Не вдалося')})};
+  if(document.getElementById('sendNumeric'))document.getElementById('sendNumeric').onclick=()=>{
+    const input=document.getElementById('numericAnswer'),number=parseQuizNumber(input.value);
+    if(number===null){alert('Введіть коректне число без літер.');input.focus();return}
+    socket.emit('submitNumericAnswer',{code,answer:input.value.trim().replace(',','.')},r=>{if(!r?.ok)alert(r?.error||'Не вдалося')});
+  };
   if(document.getElementById('sendFirstTurn'))document.getElementById('sendFirstTurn').onclick=()=>{
-    const answer=document.getElementById('firstTurnAnswer').value;
+    const input=document.getElementById('firstTurnAnswer'),answer=input.value;
+    const number=parseQuizNumber(answer,true);
+    if(number===null||number>1000000000){alert('Введіть ціле число від 0 до 1 000 000 000 без літер.');input.focus();return}
     socket.emit('submitFirstTurnAnswer',{code,answer},r=>{
       if(r&&r.ok===false){alert(r.error);return}
       if(r?.ok){
