@@ -1,7 +1,8 @@
 # Proposed fixes — SMOKERLOL Quiz
 
-> **Status:** proposals only. **Nothing here is applied to the repo.**
-> **Snapshot:** commit `46e0620`. Line numbers refer to the original files.
+> **Актуальний статус 10.10.2026:** **FIX-01…FIX-10 уже внесені до `main`** комітом [`2512a66`](https://github.com/smokerlol111/mygame/commit/2512a666d7772f16c05721db02a1915594f7c4d5). **Не застосовувати патчі нижче повторно.**
+> **Snapshot:** первинний аудит і приклади коду для коміту `46e0620`; номери рядків стосуються саме того знімка.
+> **Журнал:** [CHANGELOG.md](CHANGELOG.md). Решта документа зберігається як історична інструкція та результати перевірок на копії коду.
 > **Bug details:** [`found_bugs.md`](found_bugs.md). `FIX-0N` fixes `EASY-0N`.
 
 ---
@@ -20,7 +21,7 @@
 
 ---
 
-## 📝 Instructions for whoever applies this (human or AI)
+## 📝 Архівні інструкції з патчів (не виконувати повторно)
 
 1. Each fix is a **find → replace** of an exact snippet. **Change nothing else.**
 2. Each "Find" text appears **exactly once** in its file (checked by script).
@@ -36,16 +37,16 @@
 
 | Fix | Bug | File(s) | Size |
 |---|---|---|---|
-| [ ] FIX-01 | EASY-01 double points | `server.js` | 1 line |
-| [ ] FIX-02 | EASY-02 skipped turn | `server.js` | 1 line |
-| [ ] FIX-03 | EASY-03 leave without confirm | `public/play.html` | +1 line |
-| [ ] FIX-04 | EASY-04 restart without confirm | `public/host.html` | 1 line |
-| [ ] FIX-05 | EASY-05 Round 2 / Final without confirm | `public/host.html` | 1 line |
-| [ ] FIX-06 | EASY-06 test button mid-game | `public/host.html` + `server.js` | 1 line + 1 line |
-| [ ] FIX-07 | EASY-07 host crash on F5 | `public/host.html` | 1 line |
-| [ ] FIX-08 | EASY-08 "undefined" on OBS | `server.js` | 3 lines |
-| [ ] FIX-09 *(optional)* | MINOR-01 CSS selector | `public/host.html` | 1 line |
-| [ ] FIX-10 *(optional)* | MINOR-04 Postgres qualifier order | `storage.js` | 1 line |
+| [x] FIX-01 | EASY-01 double points | `server.js` | 1 line |
+| [x] FIX-02 | EASY-02 skipped turn | `server.js` | 1 line |
+| [x] FIX-03 | EASY-03 leave without confirm | `public/play.html` | +1 line |
+| [x] FIX-04 | EASY-04 restart without confirm | `public/host.html` | 1 line |
+| [x] FIX-05 | EASY-05 Round 2 / Final without confirm | `public/host.html` | 1 line |
+| [x] FIX-06 | EASY-06 test button mid-game | `public/host.html` + `server.js` | 1 line + 1 line |
+| [x] FIX-07 | EASY-07 host crash on F5 | `public/host.html` | 1 line |
+| [x] FIX-08 | EASY-08 "undefined" on OBS | `server.js` | 3 lines |
+| [x] FIX-09 *(optional)* | MINOR-01 CSS selector | `public/host.html` | 1 line |
+| [x] FIX-10 *(optional)* | MINOR-04 Postgres qualifier order | `storage.js` | 1 line |
 
 ---
 

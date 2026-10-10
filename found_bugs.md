@@ -1,5 +1,6 @@
 # Found bugs — SMOKERLOL Quiz
 
+> **Актуальний статус 10.10.2026:** 8 виправлень категорії EASY і 2 MINOR із цього аудиту (FIX-01…FIX-10) внесені в `main` комітом [`2512a66`](https://github.com/smokerlol111/mygame/commit/2512a666d7772f16c05721db02a1915594f7c4d5). **Описи початкових багів нижче збережені як знімок до виправлень**, а не перелік проблем, підтверджених у поточному коді. Див. [CHANGELOG.md](CHANGELOG.md).
 > **Snapshot:** commit `46e0620` (2026-10-09). `file:line` references point to that commit.
 > **Production storage:** PostgreSQL (confirmed by the owner's side, 2026-10-10). JSON-file-only bugs are parked.
 > **Architecture overview:** [`architecture.md`](architecture.md) · **Fixes:** [`proposed_fixes.md`](proposed_fixes.md)

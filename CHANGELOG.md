@@ -1,0 +1,97 @@
+# SMOKERLOL QUIZ — журнал змін та версій
+
+> **Оновлено:** 10.10.2026. **Звірено з GitHub `main`:** [5e198ea](https://github.com/smokerlol111/mygame/commit/5e198eaf3).
+> **Призначення:** єдине місце для історії релізів, змін після релізу, контрольних точок і статусів перевірок.
+> **Повний покомітний журнал:** [GitHub Commits](https://github.com/smokerlol111/mygame/commits/main/). Нижче — згрупована за датами історія з посиланнями на ключові коміти; дрібні проміжні правки, які надалі були скасовані, не оголошуються чинними можливостями.
+
+## Як читати версії
+
+- **Останній підтверджений номер релізу:** **v3.0.0** — затверджене злиття [PR #2](https://github.com/smokerlol111/mygame/pull/2) 23.09.2026.
+- `package.json` досі містить `"version": "3.0.0"`; номер пакета **не змінювали**.
+- `/health` у `server.js` повертає `3.1.0-dev`, а стартовий лог сервера — `v3.0.0-rc`. Це **неузгоджені технічні позначки**, а не підтверджені нові релізи. Виправляти їх слід лише після погодження політики версій.
+- Усі зміни нижче після 23.09.2026 — **післярелізні коміти в `main`**, без присвоєння нового номера v3.1/v4.0.
+- Історію **v1.4.1—v1.6.12**, включно з v1.5.0 «Сезони та статистика», збережено в [архівних записах README](README.md). Пропущені номери там не заповнюються заднім числом.
+- **Гілка `main`** — основна, Render деплоїть її; **Git SHA** — точний ідентифікатор збірки. Новий коміт документації не вважається новою версією гри.
+
+## 10.10.2026 — аудит, синхронізація, оформлення OBS
+
+| Коміт | Запис |
+|---|---|
+| [8f0be43](https://github.com/smokerlol111/mygame/commit/8f0be43dc) | [PR #3](https://github.com/smokerlol111/mygame/pull/3): додано архітектурний аудит, опис **38** проблем, запропоновані патчі та окремі сценарії відтворення у `tests/ai_repro/`. Початковий аудит — знімок `46e0620`. |
+| [2512a66](https://github.com/smokerlol111/mygame/commit/2512a666d) | Застосовано **FIX-01…FIX-10**: захист від повторного суддівства/переходу, підтвердження ризикових дій HOST/PLAYER, обмеження тесту Grand Final лобі, виправлення F5 під час глядацьких результатів, збереження полів фінального результату, CSS мікшера і хронології кваліфікацій PostgreSQL. |
+| [c243c60](https://github.com/smokerlol111/mygame/commit/c243c6089) | **UI-01/02:** синхронізована золотиста анімація вибраної клітинки на 1 с (HOST/PLAYER/OBS); золота заливка картки того, хто відповідає, з білим текстом. |
+| [b1211b7](https://github.com/smokerlol111/mygame/commit/b1211b73b) | [PR #4 Video fix](https://github.com/smokerlol111/mygame/pull/4): PLAYER слухає Play/Pause/Seek від HOST; прибрані ручні відеоконтроли; додано спробу розблокування відтворення на iPhone. **Фактичну роботу Safari треба тестувати на пристрої.** |
+| [7c6483f](https://github.com/smokerlol111/mygame/commit/7c6483f36) | **UI-03 «Дуель VS»:** два учасники (до вибору — знак `?`) і анімація появи суперника 0,7 с; імена, рахунки, активна золотиста картка; VS лишається під час BUZZ та результату. |
+| [8aa2a03](https://github.com/smokerlol111/mygame/commit/8aa2a0374) | **UI-04 «Кіт у мішку»:** OBS показує нік вибраного гравця над питанням і при відкритті відповіді. |
+| [77c943d](https://github.com/smokerlol111/mygame/commit/77c943dc9) | **UI-05 «ВА-БАНК»:** OBS показує, хто відповідає, очікування ставки, її суму та гравця на екрані результату; золота картка, білий текст. |
+| [5e198ea](https://github.com/smokerlol111/mygame/commit/5e198eaf3) | **UI-06 «Триплет: 3 виклики»:** етапи з номіналами й фактично перевіреними ✅/❌, підсумок серії (+/−), двосекундний підсумковий екран лише в OBS; доповнено публічний стан етапів без майбутніх відповідей. |
+
+**Обсяг UI-03—UI-05:** лише `public/screen.html`. **UI-06:** `server.js` (публічні дані результатів етапів) і `public/screen.html`. Початкове нарахування очок і механіку Триплету не переписували. Опис вище фіксує внесення коду, **не результати повного багатокористувацького тесту**.
+
+## 09.10.2026 — позначки спецклітинок
+
+- [fbe93df](https://github.com/smokerlol111/mygame/commit/fbe93df66) — дані про розміщення спецклітинок надсилаються окремо авторизованому HOST, не через загальний ігровий JSON.
+- [863886a](https://github.com/smokerlol111/mygame/commit/863886aca) — спроба зробити позначки спецклітинок помітнішими на HOST.
+- [46e0620](https://github.com/smokerlol111/mygame/commit/46e062039) — **відкат лише нового оформлення позначок**: повернено початковий вигляд. Ця проміжна косметична зміна не є чинною.
+
+## 08.10.2026 — глядачі, спеціальні клітинки, медіа
+
+- **Глядацькі раунди:** два раунди з призами, стабілізація відліку HOST/OBS, введення ніка на мобільному, підключення/перепідключення, надсилання відповідей без скидання таймера й точкове оновлення кнопки старту без повного перерендеру: [548518c](https://github.com/smokerlol111/mygame/commit/548518cf5), [e4085f4](https://github.com/smokerlol111/mygame/commit/e4085f4d7), [f2a9952](https://github.com/smokerlol111/mygame/commit/f2a9952b1), [4136c0b](https://github.com/smokerlol111/mygame/commit/4136c0b8e).
+- **Раунди та спецклітинки «Кінохардкор 2.0»:** налаштування «Кота», ВА-БАНКу та Дуелі; емоджі-питання не повинні втрачати тип; розміщення не публікується гравцям: [280f185](https://github.com/smokerlol111/mygame/commit/280f18511), [f4ff1a1](https://github.com/smokerlol111/mygame/commit/f4ff1a1fa), [728f461](https://github.com/smokerlol111/mygame/commit/728f461df).
+- **Медіа:** повернено програвання аудіо на PLAYER після відповіді та аудіоконтроли в OBS: [fc80ef8](https://github.com/smokerlol111/mygame/commit/fc80ef816), [bcc49c0](https://github.com/smokerlol111/mygame/commit/bcc49c04e).
+
+## 07.10.2026 — контент гри S2 #1 і перебудова відео/аудіо
+
+- Додані категорії та медіа другого раунду гри «Кінохардкор 2.0», фінальне питання та розіграш першого ходу: [ffae94f](https://github.com/smokerlol111/mygame/commit/ffae94f61), [b0d966c](https://github.com/smokerlol111/mygame/commit/b0d966c35), [6d7492e](https://github.com/smokerlol111/mygame/commit/6d7492e04), [9ace0cd](https://github.com/smokerlol111/mygame/commit/9ace0cda8).
+- Відеопитання з точкою зупинки (Stop!/«А далі?»), продовження після відповіді, відновлення стану та синхронізація HOST/PLAYER/OBS: [167d9ac](https://github.com/smokerlol111/mygame/commit/167d9aca0), [72053f4](https://github.com/smokerlol111/mygame/commit/72053f431), [a5ccff2](https://github.com/smokerlol111/mygame/commit/a5ccff287).
+- Поділ аудіо й відео на незалежні керування, збереження медіа під час оновлень стану, окремі етапи поступового аудіо: [c481e17](https://github.com/smokerlol111/mygame/commit/c481e17a1), [08275bc](https://github.com/smokerlol111/mygame/commit/08275bc81), [b6b7120](https://github.com/smokerlol111/mygame/commit/b6b7120ed).
+- У цю дату було також кілька **проміжних відкатів і повторних спроб** відтворення на iOS; актуальною є тільки підсумкова поведінка коду в `main`, не кожен старий експеримент.
+
+## 06–05.10.2026 — Season 2, Триплет, емоджі та захист відповідей
+
+- **06.10:** на PLAYER приховано текст звичайних питань (щоб не передавати зайву інформацію), збережено лише спеціально дозволений стан активного медіа/емоджі: [ae2763d](https://github.com/smokerlol111/mygame/commit/ae2763d1b), [1ed21e9](https://github.com/smokerlol111/mygame/commit/1ed21e962).
+- **05.10 — Season 2:** три відбори, Wild Card та відображення кваліфікації на HOST: [55dd50d](https://github.com/smokerlol111/mygame/commit/55dd50d33), [8ddbc9d](https://github.com/smokerlol111/mygame/commit/8ddbc9d1a), [885cee2](https://github.com/smokerlol111/mygame/commit/885cee22b).
+- **05.10 — Триплет:** три послідовні питання з окремими номіналами, HOST/PLAYER/OBS екрани та захист майбутніх питань від завчасної видачі: [5564e27](https://github.com/smokerlol111/mygame/commit/5564e277c), [e13eac7](https://github.com/smokerlol111/mygame/commit/e13eac7f1), [e82518f](https://github.com/smokerlol111/mygame/commit/e82518fbe).
+- **05.10 — контент:** підключено тестовий набір «КІНОХАРДКОР 2.0» Season 2 #1: [cb39d0d](https://github.com/smokerlol111/mygame/commit/cb39d0d20).
+
+## 03–01.10.2026 — безпека PLAYER, переможці сезону
+
+- **03.10:** Дуель знімає бали з іншого учасника за погодженим правилом, додано тип емоджі-питань, поліпшено мобільні поля ставок, мінімізовано надсилання прихованих відповідей/медіаданих гравцям: [28b2413](https://github.com/smokerlol111/mygame/commit/28b241383), [9dc54e1](https://github.com/smokerlol111/mygame/commit/9dc54e162), [39f9826](https://github.com/smokerlol111/mygame/commit/39f982616), [789ec1a](https://github.com/smokerlol111/mygame/commit/789ec1ac6).
+- **01.10:** Grand Final із подвійними сезонними очками, екран сезонних переможців, конфеті й HOST-керування церемонією; ручне видалення збереженої гри: [733fb9c](https://github.com/smokerlol111/mygame/commit/733fb9c21), [89d43dc](https://github.com/smokerlol111/mygame/commit/89d43dcf2), [4f73ceb](https://github.com/smokerlol111/mygame/commit/4f73ceb1e).
+
+## 30–28.09.2026 — питання, OBS, Discord, таймери
+
+- **30.09:** коригування погоджених питань та фіналу Friends Super Final; виправлення центрування/масштабування зображень і прибрання зайвого напису камерного блоку: [83f0b73](https://github.com/smokerlol111/mygame/commit/83f0b732b), [e50b694](https://github.com/smokerlol111/mygame/commit/e50b6948d), [2df8bfa](https://github.com/smokerlol111/mygame/commit/2df8bfa4f).
+- **28.09:** OBS-розмітка «камера ліворуч + чотири сегменти праворуч», впорядкування відповідей/медіа, серверні 30-секундні відліки, повторне відтворення аудіо та виправлення керування Discord Active Speaker: [11f6941](https://github.com/smokerlol111/mygame/commit/11f694199), [7582502](https://github.com/smokerlol111/mygame/commit/75825020b), [24b0602](https://github.com/smokerlol111/mygame/commit/24b06028a).
+
+## 27–23.09.2026 — Friends Super Final і базовий реліз v3.0.0
+
+- **27–25.09:** формування гри #4 Friends Super Final: категорії, питання й медіа раундів, розіграш першого ходу, запитання глядачам і фінал: [108a8d2](https://github.com/smokerlol111/mygame/commit/108a8d233), [26fab5a](https://github.com/smokerlol111/mygame/commit/26fab5a80), [c7f751d](https://github.com/smokerlol111/mygame/commit/c7f751dbd).
+- **26–24.09:** Discord Active Speaker, виправлення введення й медіа, церемоніальна музика фіналу та спеціальне спонсорське питання: [9d0dd95](https://github.com/smokerlol111/mygame/commit/9d0dd95be), [aff3500](https://github.com/smokerlol111/mygame/commit/aff3500d0).
+- **23.09:** реліз **SMOKERLOL v3.0.0 — «Назад у 2000-ні»**, [PR #2](https://github.com/smokerlol111/mygame/pull/2), merge [c6daa3f](https://github.com/smokerlol111/mygame/commit/c6daa3fb5). Післярелізні виправлення є комітами, **не новою затвердженою версією**.
+
+## Аудит: застосовано / залишається перевірити
+
+- Аудит `found_bugs.md` — історичний **знімок `46e0620`**, а не вимір поточного стану.
+- **Застосовано до `main`: FIX-01…FIX-10** (8 EASY + 2 MINOR), коміт [2512a66](https://github.com/smokerlol111/mygame/commit/2512a666d). [Початкові патчі та перелік](proposed_fixes.md). **Повторно виконувати інструкції find/replace не потрібно.**
+- Інші **28 пунктів** із початкових 38 **не входили в пакет FIX-01…FIX-10**; їхня актуальність після наступних змін може відрізнятися й потребує нового аудиту. Не позначаємо їх автоматично ні виправленими, ні відтвореними сьогодні.
+- Для змін UI-01—UI-06 були перевірки синтаксису та окремих змодельованих сценаріїв, **але не повний наскрізний ігровий тест у браузерах/OBS**. Зокрема, iPhone Safari та реальну групову гру потрібно перевірити окремо.
+
+## Контрольні точки відкату (коміти основної гілки)
+
+| Що хочемо прибрати | Коміт зміни | Стан без цієї конкретної зміни |
+|---|---|---|
+| UI-06 Триплет OBS | [5e198ea](https://github.com/smokerlol111/mygame/commit/5e198eaf3) | [77c943d](https://github.com/smokerlol111/mygame/commit/77c943dc9) |
+| UI-05 ВА-БАНК OBS | [77c943d](https://github.com/smokerlol111/mygame/commit/77c943dc9) | [8aa2a03](https://github.com/smokerlol111/mygame/commit/8aa2a0374) |
+| UI-04 Кіт у мішку OBS | [8aa2a03](https://github.com/smokerlol111/mygame/commit/8aa2a0374) | [7c6483f](https://github.com/smokerlol111/mygame/commit/7c6483f36) |
+| UI-03 Дуель OBS | [7c6483f](https://github.com/smokerlol111/mygame/commit/7c6483f36) | [b1211b7](https://github.com/smokerlol111/mygame/commit/b1211b73b) |
+| PR #4 Video fix | [b1211b7](https://github.com/smokerlol111/mygame/commit/b1211b73b) | [c243c60](https://github.com/smokerlol111/mygame/commit/c243c6089) |
+
+> **Відкат за умови подальших комітів:** застосовувати `git revert` до потрібного коміту/його зміни, а не пересувати `main` назад силоміць. Коміти в таблиці — орієнтири, не команда на відкат.
+
+## Правило подальшого ведення
+
+1. Для кожної погодженої зміни фіксувати **дату, точний SHA, файли, функціональний ефект, вплив на HOST / PLAYER / OBS / сервер / дані та спосіб перевірки**.
+2. Для виправлення позначати **погоджено → внесено до `main` → деплой → тестовано**, не підміняючи етапи один одним.
+3. Не присвоювати нову версію v3.x/v4.x без підтвердження власника. Версію пакета, `/health`, README та релізні нотатки синхронізувати окремим погодженим релізом.
+4. Історичні документи аудиту залишати прив'язаними до SHA їхнього знімка; актуальний стан фіксувати тут.
