@@ -84,6 +84,7 @@ function publicState(room) {
     pausedPhase: room.pausedPhase || null,
     round: room.round,
     used: room.used,
+    selectedTile: room.phase==='board' ? (room.selectedTile||null) : null,
     board: (getRoomGame(room).rounds?.[room.round]?.categories||[]).map(cat=>({name:cat.name,questions:(cat.questions||[]).map(q=>({value:q.value}))})),
     current: room.current ? {
       type: room.current.type,
@@ -377,7 +378,7 @@ io.on('connection', socket => {
       code: roomCode, hostToken: token, hostSocket: socket.id,
       gameId: selectedGame.id || gameId || DEFAULT_GAME_ID, gameData: selectedGame,
       voiceMappings:{}, voiceSpeaking:[], voiceUpdatedAt:0,
-      players: [], phase: 'lobby', round: 0, used: {}, current: null,
+      players: [], phase: 'lobby', round: 0, used: {}, selectedTile: null, current: null,
       buzzer: null, revealAnswer: false, answeringLocked: new Set(),
       catChooser: null, catReceiver: null, turnPlayerId: null,
       specialCells: {}, vaBankPlayer: null, vaBankBet: null, duelPlayers: [],
@@ -645,6 +646,7 @@ io.on('connection', socket => {
     clearTimeout(room.firstTurnTimer); room.firstTurnTimer = null;
     room.round = 0; room.used = {}; room.finalResults = null; room.finalRevealCount = 0;
     room.specialCells = randomSpecialCells(room);
+    room.selectedTile = null;
     room.turnPlayerId = null;
     room.firstTurnQuiz = getRoomGame(room).firstTurnQuiz || null;
     room.firstTurnAnswers = {}; room.firstTurnResults = null;
@@ -790,6 +792,7 @@ io.on('connection', socket => {
   socket.on('chooseTile', ({ code: c, ci, qi }, cb = () => {}) => {
     const room = getRoom(c);
     if (!room || room.phase !== 'board') return cb({ok:false,error:'Зараз не можна обирати питання.'});
+    if (room.selectedTile) return cb({ok:false,error:'Зачекайте: вибране питання відкривається.'});
     const pid = socket.data.playerId;
     const host = isHost(socket, room);
     if (!host && pid !== room.turnPlayerId) return cb({ok:false,error:'Зараз питання обирає інший гравець.'});
@@ -799,6 +802,17 @@ io.on('connection', socket => {
     if (!q) return cb({ok:false,error:'Невірна клітинка.'});
     const key = `${room.round}:${ci}:${qi}`;
     if (room.used[key]) return cb({ok:false,error:'Цю клітинку вже зіграно.'});
+    // Show the chosen cell for one second before starting question/media/BUZZ logic.
+    const selection = {round:room.round,ci,qi};
+    room.selectedTile=selection;
+    emitState(room);
+    setTimeout(function openSelectedTile(){
+      if (rooms.get(room.code)!==room || room.selectedTile!==selection) return;
+      if (room.paused){setTimeout(openSelectedTile,100);return;}
+      room.selectedTile=null;
+      if (room.phase!=='board' || room.round!==selection.round){
+        cb({ok:false,error:'Вибір питання скасовано.'});emitState(room);return;
+      }
     resetQuestionState(room);
     room.players.forEach(p=>p.falseStartUntil=0);
     // Question-defined formats (emoji, Triplet, numeric/media) must never be replaced
@@ -878,6 +892,7 @@ io.on('connection', socket => {
       room.phase = 'question';
     }
     cb({ok:true}); emitState(room);
+    },1000);
   });
 
   socket.on('startNumericTimer', ({code:c},cb=()=>{})=>{
@@ -1220,11 +1235,13 @@ io.on('connection', socket => {
 
   socket.on('nextRound', ({ code: c }, cb = () => {}) => {
     const room = getRoom(c); if (!isHost(socket, room) || room.round !== 0) return;
+    if (room.selectedTile) return cb({ok:false,error:'Спочатку дочекайтеся відкриття вибраного питання.'});
     room.round = 1; room.phase = 'board'; room.current = null; resetQuestionState(room); cb({ok:true}); emitState(room);
   });
 
   socket.on('startFinalBets', ({ code: c }, cb = () => {}) => {
     const room = getRoom(c); if (!isHost(socket, room)) return;
+    if (room.selectedTile) return cb({ok:false,error:'Спочатку дочекайтеся відкриття вибраного питання.'});
     room.phase = 'final_bets'; room.current = null; room.finalResults = null; room.finalRevealCount = 0;
     room.players.forEach(p => { p.bet = null; p.finalAnswer = ''; });
     cb({ok:true}); emitState(room);
