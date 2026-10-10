@@ -259,15 +259,19 @@ function startFirstTurnCountdown(room, ms){
 }
 function startFinalCountdown(room){
   clearInterval(room.finalTimer);
+  room.finalGraceTicks = 0;
   room.finalTimer = setInterval(() => {
     if(room.paused) return;
-    room.finalSeconds--;
-    if (room.finalSeconds <= 0) {
-      room.finalSeconds = 0;
-      clearInterval(room.finalTimer);
-      room.finalTimer = null;
-      room.phase = 'final_review';
+    if (room.finalSeconds > 0) {
+      room.finalSeconds--;
+      emitState(room); // at 0, player pages send any answer that was typed but not sent
+      return;
     }
+    // WORK-01: keep accepting answers for 2 s after everyone sees 0 (server 32 s, players see 30 s).
+    if (++room.finalGraceTicks < 2) return;
+    clearInterval(room.finalTimer);
+    room.finalTimer = null;
+    room.phase = 'final_review';
     emitState(room);
   }, 1000);
 }
@@ -307,8 +311,7 @@ function resumeRoom(room){
   if(previous === 'final_question' && room.pauseFinalRemaining !== null){
     room.finalSeconds = Math.max(0, Number(room.pauseFinalRemaining)||0);
     room.pauseFinalRemaining = null;
-    if(room.finalSeconds <= 0) room.phase = 'final_review';
-    else startFinalCountdown(room);
+    startFinalCountdown(room); // at 0 this only runs the 2 s answer window (WORK-01)
   }
 }
 
@@ -1290,6 +1293,10 @@ io.on('connection', socket => {
 
   socket.on('finishFinalNow', ({ code: c }) => {
     const room = getRoom(c); if (!isHost(socket, room)) return;
+    // WORK-01: if someone hasn't pressed Send, jump to 0 and keep the 2 s window for typed answers.
+    if (room.phase === 'final_question' && room.players.some(p => !p.finalAnswer)) {
+      room.finalSeconds = 0; startFinalCountdown(room); emitState(room); return;
+    }
     clearInterval(room.finalTimer); room.finalTimer = null; room.phase = 'final_review'; emitState(room);
   });
 
