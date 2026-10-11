@@ -195,6 +195,16 @@ if(playerId&&savedCode&&name&&(!urlCode||urlCode===savedCode)){
   });
 }
 
+// WORK-01: when the final timer shows 0, send what was typed if Send wasn't pressed.
+// The server keeps accepting answers for 2 more seconds, so this arrives in time.
+function sendFinalDraftAtZero(){
+  const box=document.getElementById('finalAnswer');
+  if(!box||box.disabled)return;
+  box.disabled=true;
+  const btn=document.getElementById('sendFinal');if(btn)btn.disabled=true;
+  const answer=box.value.trim();
+  if(answer)socket.emit('submitFinalAnswer',{code,answer},()=>{});
+}
 socket.on('state',async s=>{
   if(!joined||s.code!==code)return;
   if(s.gameId&&s.gameId!==loadedGameId){try{await ensureGameData(s.gameId)}catch(e){console.error(e)}}
@@ -214,6 +224,7 @@ socket.on('state',async s=>{
     if(s.phase==='final_question' && !!prevMe?.hasFinalAnswer===!!nextMe?.hasFinalAnswer){
       const timer=document.getElementById('finalSeconds');
       if(timer)timer.textContent=String(s.finalSeconds);
+      if(Number(s.finalSeconds)<=0 && !nextMe?.hasFinalAnswer)sendFinalDraftAtZero();
       return;
     }
     if(s.phase==='numeric_question'){
