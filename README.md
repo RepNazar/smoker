@@ -25,11 +25,17 @@ Deployment-ready онлайн-версія для 4 гравців із окре
 - підготовлено для одного Render Web Service із Socket.IO/WebSocket.
 
 ## Локальна перевірка
+Потрібен Node.js 20.12 або новіший. При запуску сервер автоматично читає `.env` у корені проєкту:
+`PORT`, `DISCORD_BOT_TOKEN`, `DISCORD_GUILD_ID` та `DISCORD_VOICE_CHANNEL_ID`.
+Заповніть параметри Discord у цьому файлі один раз. Змінні середовища запуску мають пріоритет над `.env`.
+Без файлу `.env` сервер також працює; бот запускається лише за наявності всіх трьох параметрів Discord.
+
 ```bash
 npm install
 npm start
 ```
-Після цього відкрийте `http://localhost:3000/host`.
+На Windows `npm start` запускає гру на порту **3100** і Tailscale Funnel; відкрийте `http://localhost:3100/host`. Потрібні встановлений та авторизований Tailscale і доступ до Funnel.
+Для запуску лише сервера використовуйте `npm run start:server` (порт із `PORT` або 3000). На Linux, зокрема Render, `npm start` запускає лише сервер.
 
 ## Render
 Найпростіший шлях — GitHub + Render Blueprint. Повна інструкція лежить у `RENDER_DEPLOY.md`.

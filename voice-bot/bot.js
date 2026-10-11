@@ -11,6 +11,7 @@ if (![token,guildId,channelId].every(Boolean)) {
 }
 const client = new Client({ intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildVoiceStates] });
 let connection=null, connecting=false, sweep=null;
+let loginError='';
 const active=new Set(), lastStart=new Map();
 const sendActivity=()=>{if(process.send)process.send({type:'voiceActivity',guildId,channelId,userIds:[...active]})};
 const sendStatus=(status,error='')=>{if(process.send)process.send({type:'voiceStatus',status,error})};
@@ -18,6 +19,10 @@ function clearActivity(){active.clear();lastStart.clear();sendActivity()}
 function stopSweep(){if(sweep){clearInterval(sweep);sweep=null}}
 
 async function connectVoice(){
+  if(!client.isReady()){
+    sendStatus(loginError?'unavailable':'starting',loginError||'Discord bot is still logging in.');
+    return;
+  }
   if(connecting || connection?.state?.status===VoiceConnectionStatus.Ready)return;
   connecting=true;sendStatus('connecting');
   try{
@@ -49,5 +54,12 @@ function disconnectVoice(){
 client.once(Events.ClientReady,()=>{console.log('Bot logged in as '+client.user.tag+'; waiting for host to enable Active Speaker.');sendStatus('disconnected')});
 client.on('error',error=>console.error('Discord client:',error.message));
 process.on('message',message=>{if(message?.type==='voiceConnect')connectVoice();else if(message?.type==='voiceDisconnect')disconnectVoice()});
-client.login(token).catch(error=>{console.error('Discord login failed:',error.message);sendStatus('unavailable',error.message);process.exitCode=1});
+client.login(token).catch(error=>{
+  const details=error.errors?.map(item=>[item.code,item.message].filter(Boolean).join(': ')).filter(Boolean).join('; ');
+  loginError=[error.name,error.code,error.message,details].filter(Boolean).join(': ')||'Discord login failed';
+  console.error('Discord login failed:',loginError);
+  sendStatus('unavailable',loginError);
+  client.destroy();
+  process.exitCode=1;
+});
 process.on('SIGTERM',()=>{disconnectVoice();client.destroy();process.exit(0)});

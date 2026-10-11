@@ -8,7 +8,25 @@ window.GameUI = (()=>{
     if(state.phase==='triplet_question')return state.current?.triplet?.answererId||null;
     return null;
   }
-  function playersHTML(players,buzzer){return `<div class="scorebar">${players.map(p=>`<div class="player ${p.id===buzzer?'active':''}"><div><b>${esc(p.name)}</b> ${p.connected?'🟢':'⚫'}</div><div class="score">${p.score}</div></div>`).join('')}</div>`}
+  function showBuzzReactions(state){
+    return !!state?.current && ['normal','duel'].includes(state.current.type) &&
+      ['question','duel_question','buzz','answering','result','video_result'].includes(state.phase) &&
+      !state.current.triplet && state.current.questionType!=='numericClosest';
+  }
+  function reactionHTML(p,state){
+    if(!showBuzzReactions(state))return '';
+    if(state.current.type==='duel' && !(state.duelPlayers||[]).includes(p.id))return '';
+    const value=Number.isFinite(p.reactionMs)?`${Math.max(0,Math.round(p.reactionMs))} мс`:'—';
+    return `<span class="player-reaction ${p.reactionWrong?'wrong':''}" aria-label="Час реакції${p.reactionWrong?', неправильна відповідь':''}">${value}</span>`;
+  }
+  function wrongAnswerClass(p,state){
+    if(!state?.current || state.current.triplet)return '';
+    if(!['normal','duel','cat','va_bank'].includes(state.current.type))return '';
+    if(!['question','buzz','answering','cat_question','va_bank_question','result','video_result'].includes(state.phase))return '';
+    if(state.current.type==='duel' && !(state.duelPlayers||[]).includes(p.id))return '';
+    return (state.answeringLocked||[]).includes(p.id)?'answer-wrong':'';
+  }
+  function playersHTML(players,buzzer,state){return `<div class="scorebar">${players.map(p=>`<div class="player ${p.id===buzzer?'active':''} ${wrongAnswerClass(p,state)}"><div><b>${esc(p.name)}</b> ${p.connected?'🟢':'⚫'} ${reactionHTML(p,state)}</div><div class="score">${p.score}</div></div>`).join('')}</div>`}
   function boardHTML(data,state,clickable=true){const r=data.rounds[state.round];let h='<div class="grid">';r.categories.forEach(c=>h+=`<div class="cat">${esc(c.name)}</div>`);for(let qi=0;qi<5;qi++){r.categories.forEach((c,ci)=>{const q=c.questions[qi],key=`${state.round}:${ci}:${qi}`,used=state.used[key],selected=state.selectedTile?.round===state.round&&state.selectedTile.ci===ci&&state.selectedTile.qi===qi;h+=`<button class="tile ${used?'used':''} ${selected?'tile-selecting':''}" data-ci="${ci}" data-qi="${qi}" ${(!clickable||used||state.selectedTile)?'disabled':''}>${q.value}</button>`})}return h+'</div>'}
-  return {esc,playersHTML,boardHTML,answererId};
+  return {esc,playersHTML,boardHTML,answererId,reactionHTML,showBuzzReactions,wrongAnswerClass};
 })();

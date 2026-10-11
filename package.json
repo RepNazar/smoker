@@ -5,10 +5,12 @@
   "description": "SMOKERLOL QUIZ v3.0.0 — Назад у 2000-ні",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js"
+    "start": "node start.js",
+    "start:server": "node server.js",
+    "start:local": "powershell -NoProfile -ExecutionPolicy Bypass -File ./start-local.ps1"
   },
   "engines": {
-    "node": ">=18"
+    "node": ">=20.12"
   },
   "dependencies": {
     "express": "^4.21.2",

@@ -17,7 +17,6 @@
 </style>
 </head><body><div id="netBadge" style="position:fixed;right:14px;bottom:14px;z-index:9999;padding:8px 12px;border-radius:999px;background:#201833;border:1px solid #4d3d73;font-weight:800">🟡 Підключення…</div><div class="wrap"><div class="top"><div><div class="brand">SMOKERLOL • HOST</div><h1>СВОЯ ГРА — КІНОХАРДКОР</h1></div><div id="roomBox"></div></div><div class="cueMixer" aria-label="Гучність звукових сигналів"><label for="gongVolume">🔔 Гонг <input id="gongVolume" type="range" min="0" max="100" step="1" value="35" aria-label="Гучність гонга"><output id="gongVolumeValue" for="gongVolume">35%</output></label><label for="buzzVolume">✨ Відкрити BUZZ <input id="buzzVolume" type="range" min="0" max="100" step="1" value="35" aria-label="Гучність відкриття BUZZ"><output id="buzzVolumeValue" for="buzzVolume">35%</output></label></div><div id="app" class="panel"><button id="create" class="btn">Створити онлайн-кімнату</button></div></div><script>
 const socket=io();
-let cueAudioCtx=null;
 const cueAudio={
  question:new Audio('/sounds/question.mp3'),
  buzz_open:new Audio('/sounds/buzz.mp3')
@@ -247,7 +246,7 @@ function hostPlayersHTML(players,buzzer){
    const jitter=Number.isFinite(Number(p.networkJitterMs))?Math.round(Number(p.networkJitterMs)):null;
    const ready=!p.connected?'🔴 LOST':p.syncReady?'🟢 READY':'🟡 SYNC…';
    const net=rtt==null?'⚪ ping —':(rtt<80?'🟢':rtt<160?'🟡':'🔴')+' '+rtt+' ms'+(jitter==null?'':' • jitter '+jitter+' ms');
-   return `<div class="player ${p.id===answerer?'active':''} ${state?.voice?.speakingPlayerIds?.includes(p.id)?'voice-speaking':''}" data-player-id="${GameUI.esc(p.id)}"><div><b>${GameUI.esc(p.name)}</b> ${p.connected?'🟢':'⚫'}</div><div class="muted player-network" style="font-size:12px;margin-top:4px">${ready} • ${net}</div><div class="score">${p.score}</div></div>`;
+   return `<div class="player ${GameUI.wrongAnswerClass(p,state)} ${p.id===answerer?'active':''} ${state?.voice?.speakingPlayerIds?.includes(p.id)?'voice-speaking':''}" data-player-id="${GameUI.esc(p.id)}"><div><b>${GameUI.esc(p.name)}</b> ${p.connected?'🟢':'⚫'} ${GameUI.reactionHTML(p,state)}</div><div class="muted player-network" style="font-size:12px;margin-top:4px">${ready} • ${net}</div><div class="score">${p.score}</div></div>`;
  }).join('')}</div>`;
 }
 
@@ -319,7 +318,6 @@ function mediaQuestionHTML(cur,host=false){
  const media=video?`<video class="quizMedia quizVideo" src="${src}" data-pause-at="${Number(cur.pauseAt||0)}" controls playsinline preload="metadata" style="width:100%;max-height:50vh"></video>`:`<audio class="quizMedia quizAudio" src="${src}" controls preload="metadata" style="width:100%"></audio>`;
  return `<div class="panel media-question" style="margin:12px auto;max-width:820px">${media}${progress?`<div class="muted">${lastAudio?'Повне аудіо':`Фрагмент до ${seconds} с`} · ${cur.value} балів</div>`:''}${host&&progress&&cur.revealStage<cur.revealValues.length-1?'<button class="btn gold" id="revealAudioStep">▶ Наступний фрагмент</button>':''}</div>`;
 }
-let mediaPlaybackSnapshot=null;
 function captureMediaPlayback(){
  const el=document.querySelector('video.quizVideo,audio.quizAudio');
  if(!el||!state?.current)return null;

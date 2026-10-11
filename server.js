@@ -1,3 +1,11 @@
+// Load local settings before storage, server and Discord initialization.
+// Existing environment variables take precedence over the file.
+try {
+  process.loadEnvFile(process.env.DOTENV_CONFIG_PATH || require('path').join(__dirname, '.env'));
+} catch (error) {
+  if (error.code !== 'ENOENT') throw error;
+}
+
 const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
@@ -153,7 +161,7 @@ function publicState(room) {
     vaBankBet: room.vaBankBet,
     duelPlayers: room.duelPlayers || [],
     voice: { speakingPlayerIds: (room.voiceSpeaking||[]).filter(id=>room.players.some(p=>p.id===id)), updatedAt:room.voiceUpdatedAt||0 },
-    players: room.players.map(p => ({ id: p.id, name: p.name, score: p.score, connected: p.connected, falseStartUntil: Number(p.falseStartUntil||0), falseStartRemainingMs: Math.max(0, Number(p.falseStartUntil||0) - Date.now()), networkRttMs: Number.isFinite(p.networkRttMs) ? Math.round(p.networkRttMs) : null, networkJitterMs: Number.isFinite(p.networkJitterMs) ? Math.round(p.networkJitterMs) : null, syncReady: !!p.connected && Number(p.syncSamples||0)>=3 && Date.now()-Number(p.lastSyncAt||0)<12000, hasBet: p.bet !== null, hasFinalAnswer: !!p.finalAnswer, finalAnswer: ['final_review','final_result'].includes(room.phase) ? p.finalAnswer : '' })),
+    players: room.players.map(p => ({ id: p.id, name: p.name, score: p.score, connected: p.connected, reactionMs: room.buzzReactions?.[p.id] ?? null, reactionWrong: !!room.answeringLocked?.has(p.id), falseStartUntil: Number(p.falseStartUntil||0), falseStartRemainingMs: Math.max(0, Number(p.falseStartUntil||0) - Date.now()), networkRttMs: Number.isFinite(p.networkRttMs) ? Math.round(p.networkRttMs) : null, networkJitterMs: Number.isFinite(p.networkJitterMs) ? Math.round(p.networkJitterMs) : null, syncReady: !!p.connected && Number(p.syncSamples||0)>=3 && Date.now()-Number(p.lastSyncAt||0)<12000, hasBet: p.bet !== null, hasFinalAnswer: !!p.finalAnswer, finalAnswer: ['final_review','final_result'].includes(room.phase) ? p.finalAnswer : '' })),
     buzzOpensAt: room.buzzOpensAt || null,
     answeringLocked: Array.from(room.answeringLocked || []),
     finalSeconds: room.finalSeconds,
@@ -212,12 +220,8 @@ function emitPlayerPresence(room, player) {
 }
 function getRoom(c) { return rooms.get(String(c || '').toUpperCase()); }
 function isHost(socket, room) { return room && socket.data.hostToken && socket.data.hostToken === room.hostToken; }
-function currentQuestion(room) {
-  if (!room.current || room.current.type === 'final') return null;
-  const game = getRoomGame(room);
-  return game.rounds[room.round].categories[room.current.ci].questions[room.current.qi];
-}
 function resetQuestionState(room) {
+  room.buzzReactions = {};
   room.buzzer = null;
   room.revealAnswer = false; room.resultReason = null;
   room.answeringLocked = new Set();
@@ -230,6 +234,11 @@ function resetQuestionState(room) {
   room.buzzCandidates = [];
   if (room.buzzResolveTimer) clearTimeout(room.buzzResolveTimer);
   room.buzzResolveTimer = null;
+}
+function resetEligibleBuzzReactions(room) {
+  for (const id of Object.keys(room.buzzReactions || {})) {
+    if (!room.answeringLocked.has(id)) delete room.buzzReactions[id];
+  }
 }
 function advanceTurn(room) {
   if (!room.players.length) { room.turnPlayerId = null; return; }
@@ -396,7 +405,7 @@ io.on('connection', socket => {
       numericChallenge: null, numericAnswers: {}, numericSubmittedAt: {}, numericResults: null, numericEndsAt: null, numericTimer: null, numericRevealCount: 0,
       audience: [], audienceRoundIndex: null, audienceQuestionIndex: 0, audienceAnswers: {}, audienceStartedAt: null, audienceEndsAt: null, audienceTimer: null, audienceReturnPhase: null, audienceRevealCount: 0, audienceWinners: [],
       paused: false, pausedPhase: null, pauseFirstTurnRemaining: null, pauseFinalRemaining: null,
-      buzzCandidates: [], buzzResolveTimer: null
+      buzzCandidates: [], buzzResolveTimer: null, buzzReactions: {}
     };
     rooms.set(roomCode, room);
     socket.data.hostToken = token;
@@ -500,6 +509,7 @@ io.on('connection', socket => {
     if(room.current.type==='final'||['cat_question','va_bank_question'].includes(room.phase))
       return cb({ok:false,error:'Для цього типу питання BUZZ не використовується.'});
     const leadMs=1200;
+    resetEligibleBuzzReactions(room);
     room.buzzer=null; room.phase='buzz'; room.resultReason=null; room.buzzCandidates=[]; if(room.buzzResolveTimer){clearTimeout(room.buzzResolveTimer);room.buzzResolveTimer=null;} room.buzzOpensAt=Date.now()+leadMs;
     io.to(room.code).emit('buzzScheduled',{opensAt:room.buzzOpensAt});
     setTimeout(()=>{if(rooms.get(room.code)===room&&room.phase==='buzz'&&!room.buzzer)io.to(room.code).emit('cue',{type:'buzz_open',at:room.buzzOpensAt,playerIds:[...(room.duelPlayers||[])]})},leadMs);
@@ -658,8 +668,6 @@ io.on('connection', socket => {
     room.firstTurnAnswers = {}; room.firstTurnResults = null;
     room.firstTurnTimerStatus = 'ready'; room.firstTurnEndsAt = null;
     room.firstTurnRevealCount = 0;
-    room.firstTurnRevealCount = 0;
-    room.firstTurnTimerStatus = 'ready'; room.firstTurnEndsAt = null;
     room.players.forEach(p => { p.score = 0; p.bet = null; p.finalAnswer = ''; });
     room.paused=false; room.pausedPhase=null; room.pauseFirstTurnRemaining=null; room.pauseFinalRemaining=null;
     room.phase = room.firstTurnQuiz ? 'first_turn_quiz' : 'board';
@@ -979,7 +987,7 @@ io.on('connection', socket => {
     const unready=room.players.filter(p=>p.connected && (Number(p.syncSamples||0)<3 || Date.now()-Number(p.lastSyncAt||0)>=12000));
     if(unready.length)return cb({ok:false,error:'Очікуємо SYNC: '+unready.map(p=>p.name).join(', ')});
     const leadMs=1200;
-    room.phase='buzz'; room.buzzer=null; room.answeringLocked=new Set(); room.resultReason=null; room.buzzCandidates=[]; if(room.buzzResolveTimer){clearTimeout(room.buzzResolveTimer);room.buzzResolveTimer=null;}
+    room.phase='buzz'; room.buzzer=null; room.answeringLocked=new Set(); room.buzzReactions={}; room.resultReason=null; room.buzzCandidates=[]; if(room.buzzResolveTimer){clearTimeout(room.buzzResolveTimer);room.buzzResolveTimer=null;}
     room.buzzOpensAt=Date.now()+leadMs;
     io.to(room.code).emit('buzzScheduled',{opensAt:room.buzzOpensAt});
     setTimeout(()=>{ if(rooms.get(room.code)===room && room.phase==='buzz' && !room.buzzer && room.buzzOpensAt && Date.now()>=room.buzzOpensAt-20) io.to(room.code).emit('cue',{type:'buzz_open',at:room.buzzOpensAt}); },leadMs);
@@ -1021,7 +1029,7 @@ io.on('connection', socket => {
 
     room.buzzCandidates = room.buzzCandidates || [];
     if(!room.buzzCandidates.some(x=>x.playerId===p.id)){
-      room.buzzCandidates.push({playerId:p.id,pressTime,receivedAt});
+      room.buzzCandidates.push({playerId:p.id,pressTime,receivedAt,reactionMs:Math.round(Math.max(0,pressTime-Number(room.buzzOpensAt||0)))});
     }
     cb({ok:true,pending:true});
 
@@ -1036,6 +1044,8 @@ io.on('connection', socket => {
         });
         room.buzzCandidates=[];
         if(!candidates.length)return;
+        room.buzzReactions = room.buzzReactions || {};
+        for (const candidate of candidates) room.buzzReactions[candidate.playerId] = candidate.reactionMs;
         candidates.sort((a,b)=>a.pressTime-b.pressTime || a.receivedAt-b.receivedAt);
         const winner=candidates[0];
         room.buzzer=winner.playerId;
@@ -1068,6 +1078,7 @@ io.on('connection', socket => {
       room.phase = 'result';
     } else {
       room.answeringLocked.add(p.id);
+      resetEligibleBuzzReactions(room);
       room.buzzer = null;
       // Important: do not auto-finish just because another player is temporarily disconnected.
       // Auto-reveal only when EVERY player in the room has already answered incorrectly.
@@ -1105,6 +1116,7 @@ io.on('connection', socket => {
     if(!isHost(socket,room) || room.phase!=='va_bank_question' || !room.vaBankPlayer) return;
     const p=room.players.find(x=>x.id===room.vaBankPlayer); if(!p)return;
     p.score += correct ? room.vaBankBet : -room.vaBankBet;
+    if (!correct) room.answeringLocked.add(p.id);
     room.revealAnswer=true; room.resultReason=correct?'correct':'va_bank_wrong'; room.phase='result';
     cb({ok:true}); emitState(room);
   });
@@ -1124,7 +1136,7 @@ io.on('connection', socket => {
     const room=getRoom(c);
     if(!isHost(socket,room) || room.phase!=='duel_question') return;
     const leadMs=1200;
-    room.phase='buzz'; room.buzzer=null; room.answeringLocked=new Set(); room.resultReason=null; room.buzzCandidates=[]; if(room.buzzResolveTimer){clearTimeout(room.buzzResolveTimer);room.buzzResolveTimer=null;} room.buzzOpensAt=Date.now()+leadMs;
+    room.phase='buzz'; room.buzzer=null; room.answeringLocked=new Set(); room.buzzReactions={}; room.resultReason=null; room.buzzCandidates=[]; if(room.buzzResolveTimer){clearTimeout(room.buzzResolveTimer);room.buzzResolveTimer=null;} room.buzzOpensAt=Date.now()+leadMs;
     io.to(room.code).emit('buzzScheduled',{opensAt:room.buzzOpensAt});
     setTimeout(()=>{if(rooms.get(room.code)===room&&room.phase==='buzz'&&!room.buzzer)io.to(room.code).emit('cue',{type:'buzz_open',at:room.buzzOpensAt})},leadMs);
     cb({ok:true,opensAt:room.buzzOpensAt}); emitState(room);
@@ -1188,6 +1200,7 @@ io.on('connection', socket => {
     const p = room.players.find(x => x.id === room.catReceiver);
     if (!p) return;
     p.score += correct ? room.current.value : -room.current.value;
+    if (!correct) room.answeringLocked.add(p.id);
     room.revealAnswer = true; room.phase = 'result'; cb({ok:true}); emitState(room);
   });
 
@@ -1377,7 +1390,7 @@ io.on('connection', socket => {
     clearInterval(room.finalTimer); room.finalTimer = null;
     clearTimeout(room.firstTurnTimer); room.firstTurnTimer = null;
     room.phase = 'lobby'; room.paused=false; room.pausedPhase=null; room.pauseFirstTurnRemaining=null; room.pauseFinalRemaining=null; room.round = 0; room.used = {}; room.current = null;
-    room.buzzer = null; room.revealAnswer = false; room.answeringLocked = new Set();
+    room.buzzer = null; room.revealAnswer = false; room.answeringLocked = new Set(); room.buzzReactions = {};
     room.catChooser = null; room.catReceiver = null; room.turnPlayerId = null;
     room.specialCells = {}; room.vaBankPlayer = null; room.vaBankBet = null; room.duelPlayers = [];
     room.finalSeconds = 30; room.finalResults = null; room.finalRevealCount = 0; room.savedSeasonGameId = null; room.savedSeasonId = null; room.seasonFinal = null; room.seasonCeremonyActive = false; room.seasonRevealCount = 0;

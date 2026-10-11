@@ -21,7 +21,7 @@ function freePort() {
 async function startServer() {
   const port = await freePort();
   const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'smokerlol-repro-'));
-  const env = { ...process.env, PORT: String(port), DATA_DIR: dataDir };
+  const env = { ...process.env, PORT: String(port), DATA_DIR: dataDir, DOTENV_CONFIG_PATH: path.join(dataDir, '.env') };
   for (const key of ['DATABASE_URL', 'PGSSL', 'DISCORD_BOT_TOKEN', 'DISCORD_GUILD_ID', 'DISCORD_VOICE_CHANNEL_ID']) delete env[key];
   const child = spawn(process.execPath, ['server.js'], { cwd: REPO_ROOT, env, stdio: ['ignore', 'pipe', 'pipe'] });
   let output = '';

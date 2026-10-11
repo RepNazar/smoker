@@ -58,3 +58,16 @@ body:before{content:'';position:fixed;inset:0;pointer-events:none;background:lin
   color:#fff!important;text-shadow:none!important;
 }
 @media(prefers-reduced-motion:reduce){.tile.tile-selecting{animation:none!important;transform:none!important}}
+
+.player-reaction{display:inline-block;margin-left:6px;font-size:14px;font-weight:700;white-space:nowrap;font-variant-numeric:tabular-nums;color:var(--muted)}
+.player-reaction.wrong{color:var(--bad)}
+
+.scorebar .player.answer-wrong,
+.scorebar .player.answer-wrong:is(.active,.voice-speaking),
+#app .scorebar .player.answer-wrong,
+#app .scorebar .player.answer-wrong:is(.active,.voice-speaking){
+  background:linear-gradient(145deg,#593039,#381f2c)!important;
+  border-color:#df8d97!important;color:#fff!important;
+  outline:2px solid #df8d97!important;
+  box-shadow:inset 0 0 20px rgba(223,141,151,.12)!important;
+}
