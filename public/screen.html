@@ -1,542 +1,1727 @@
-<!doctype html><html lang="uk"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>OBS Screen — Своя гра</title><link rel="stylesheet" href="/style.css?v=1617"><script src="/socket.io/socket.io.js"></script><script src="/common.js?v=1613"></script>
-<style>
-/* v1.5.10 — larger question text for the stream/OBS view */
-#app .question{
-  font-size:clamp(30px,3.25vw,52px);
-  line-height:1.18;
-  font-weight:800;
-  max-width:1120px;
-  margin-left:auto;
-  margin-right:auto;
-}
-/* Compact OBS question layout: keep long text and answer illustrations above the scorebar. */
-body.screen #app .question{font-size:clamp(22px,2.5vw,38px);line-height:1.17;padding:clamp(6px,1.2vh,14px) 8px;max-width:1100px;overflow-wrap:break-word}
-body.screen #app .panel{padding:clamp(8px,1.3vh,16px);margin-top:8px}
-body.screen #app .answer{font-size:clamp(15px,1.45vw,23px);line-height:1.2;margin-top:6px}
-body.screen #app .panel img[alt="Ілюстрація правильної відповіді"]{max-height:38vh!important;margin:6px auto!important}
-body.screen #app .media-question{margin:6px auto!important;padding:8px!important}
-body.screen #app .quizMedia{max-height:40vh!important}
-body.screen #app .imageRevealWrap{margin:4px auto}
-body.screen #app .imageRevealImg{max-height:54vh}
-body.screen #app .imageRevealValue{font-size:clamp(18px,2vw,28px);padding:4px 12px;margin-bottom:6px}
-body.screen #app .scorebar{margin-top:8px}
-body.screen #app .scorebar .player{padding:7px}
-</style>
+<!doctype html>
+<html lang="uk">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>OBS Screen — Своя гра</title>
+    <link rel="stylesheet" href="/style.css?v=1617" />
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="/common.js?v=1613"></script>
+    <style>
+      /* v1.5.10 — larger question text for the stream/OBS view */
+      #app .question {
+        font-size: clamp(30px, 3.25vw, 52px);
+        line-height: 1.18;
+        font-weight: 800;
+        max-width: 1120px;
+        margin-left: auto;
+        margin-right: auto;
+      }
+      /* Compact OBS question layout: keep long text and answer illustrations above the scorebar. */
+      body.screen #app .question {
+        font-size: clamp(22px, 2.5vw, 38px);
+        line-height: 1.17;
+        padding: clamp(6px, 1.2vh, 14px) 8px;
+        max-width: 1100px;
+        overflow-wrap: break-word;
+      }
+      body.screen #app .panel {
+        padding: clamp(8px, 1.3vh, 16px);
+        margin-top: 8px;
+      }
+      body.screen #app .answer {
+        font-size: clamp(15px, 1.45vw, 23px);
+        line-height: 1.2;
+        margin-top: 6px;
+      }
+      body.screen #app .panel img[alt="Ілюстрація правильної відповіді"] {
+        max-height: 38vh !important;
+        margin: 6px auto !important;
+      }
+      body.screen #app .media-question {
+        margin: 6px auto !important;
+        padding: 8px !important;
+      }
+      body.screen #app .quizMedia {
+        max-height: 40vh !important;
+      }
+      body.screen #app .imageRevealWrap {
+        margin: 4px auto;
+      }
+      body.screen #app .imageRevealImg {
+        max-height: 54vh;
+      }
+      body.screen #app .imageRevealValue {
+        font-size: clamp(18px, 2vw, 28px);
+        padding: 4px 12px;
+        margin-bottom: 6px;
+      }
+      body.screen #app .scorebar {
+        margin-top: 8px;
+      }
+      body.screen #app .scorebar .player {
+        padding: 7px;
+      }
+    </style>
 
-<style>
-.imageRevealWrap{width:min(100%,620px);max-width:620px;margin:12px auto;text-align:center}
-.imageRevealFrame{overflow:hidden;border-radius:18px;border:2px solid rgba(255,255,255,.18);background:#090514;box-shadow:0 16px 50px rgba(0,0,0,.42)}
-.imageRevealImg{display:block;width:100%;max-height:38vh;object-fit:contain;transition:filter .65s ease,transform .65s ease}
-.imageRevealValue{display:inline-block;margin:0 0 12px;padding:8px 18px;border-radius:999px;font-weight:900;font-size:clamp(24px,3vw,42px);background:rgba(255,196,0,.14);border:1px solid rgba(255,215,70,.45)}
-.emojiQuestion{font-size:clamp(64px,8vw,118px);line-height:1.2;text-align:center;letter-spacing:.14em;padding:8px 10px;white-space:normal}
-</style>
-<style>
-/* v1.6.9 — permanent OBS camera-safe area */
-body.screen .wrap{max-width:none;padding-left:340px;padding-right:24px;box-sizing:border-box}
-.cameraSafe{position:fixed;left:18px;top:18px;width:292px;aspect-ratio:16/9;border:2px dashed rgba(255,255,255,.22);border-radius:18px;background:rgba(0,0,0,.16);display:flex;align-items:center;justify-content:center;font-weight:900;letter-spacing:.12em;color:rgba(255,255,255,.28);z-index:0}
-.imageRevealWrap{max-width:1180px;margin:8px auto}.imageRevealImg{width:100%;height:auto;max-height:64vh;object-fit:contain}.imageRevealFrame{display:flex;align-items:center;justify-content:center}
-.audQr{width:min(300px,24vw);background:white;padding:10px;border-radius:18px}.audGrid{display:grid;grid-template-columns:1fr 1fr;gap:12px;max-width:1000px;margin:18px auto}.audOpt{padding:16px;border-radius:14px;background:rgba(255,255,255,.08);font-size:24px;font-weight:800}
-@media(max-width:1200px){body.screen .wrap{padding-left:300px}.cameraSafe{width:250px}}
-</style><style>
-/* v3.1 Active Speaker: highlight the EXISTING score cards, no separate overlay. */
-#app .scorebar .player.voice-speaking{border-color:#a78bfa!important;outline:3px solid #a78bfa!important;outline-offset:-3px!important;background:rgba(124,58,237,.35)!important;box-shadow:0 0 0 3px rgba(167,139,250,.22),0 0 28px rgba(167,139,250,.65)!important;transform:none!important;transition:background .12s,outline-color .12s,box-shadow .12s}
-/* OBS v3 test layout: fixed camera block + four right-side gameplay segments. */
-body.screen{overflow:hidden}
-body.screen .wrap{position:fixed;left:340px;right:24px;top:0;bottom:0;padding:12px 0!important;max-width:none;box-sizing:border-box}
-.cameraSafe{position:fixed!important;left:0!important;top:0!important;bottom:0!important;width:316px!important;height:100vh!important;aspect-ratio:auto!important;border-radius:0!important;box-sizing:border-box}
-#app{height:100%}
-.obsGameLayout{height:100%;display:grid;grid-template-rows:minmax(0,1fr) auto 92px 112px;gap:8px;min-height:0}
-.obsSegment{min-width:0;min-height:0;box-sizing:border-box;border-radius:14px}
-.obsSegmentQuestion{display:flex;flex-direction:column;align-items:center;justify-content:center;overflow:hidden}
-.obsSegmentQuestion .question{margin:0!important;width:100%;box-sizing:border-box}
-.obsSegmentMedia{display:flex;align-items:center;justify-content:center;max-height:50vh;overflow:visible}
-.obsSegmentMedia:empty{display:none}
-.obsSegmentMedia .media-question{margin:0 auto!important;width:100%;height:auto!important;box-sizing:border-box}
-.obsSegmentMedia .media-question audio{display:block;width:100%!important;height:54px!important}
-.obsSegmentMedia .imageRevealWrap{margin:0 auto!important;width:100%;height:auto!important;max-height:50vh;display:flex;flex-direction:column;align-items:center;box-sizing:border-box}
-.obsSegmentMedia .imageRevealFrame{width:100%;height:min(38vh,420px)!important;max-height:calc(50vh - 42px);overflow:hidden!important;display:flex!important;align-items:center!important;justify-content:center!important}
-.obsSegmentMedia .imageRevealFrame .imageRevealImg{width:100%!important;height:100%!important;max-width:100%!important;max-height:100%!important;object-fit:contain!important;object-position:center center!important;transform:none!important}
-.obsSegmentMedia .quizMedia,.obsSegmentMedia .imageRevealImg,.obsSegmentMedia img{display:block;width:auto!important;max-width:100%!important;height:auto!important;max-height:calc(50vh - 42px)!important;object-fit:contain!important;object-position:center center!important;transform-origin:center center!important;margin:auto}
-.obsSegmentMedia .imageRevealImg{transform:none!important}
-.obsSegmentAnswer{display:flex;align-items:center;justify-content:center;overflow:hidden;padding:6px 12px}
-.obsSegmentAnswer.is-empty{visibility:hidden!important;border:0!important;background:transparent!important;box-shadow:none!important;padding:0!important}
-.obsSegmentAnswer .answer{margin:0!important;width:100%;text-align:center}
-.obsSegmentPlayers{display:flex;align-items:stretch;overflow:hidden}
-.obsSegmentPlayers .scorebar{width:100%;height:100%;margin:0!important;align-items:stretch}
-.obsSegmentPlayers .scorebar .player{display:flex;flex-direction:column;justify-content:center;box-sizing:border-box}
-.obsSegmentPlayers .scorebar .player.active{outline:none!important;box-shadow:inset 0 1px 0 rgba(255,255,255,.035)!important}
-#app .scorebar .player.active,#app .scorebar .player.active.voice-speaking{
-  background:linear-gradient(150deg,#665027,#453618)!important;
-  border-color:#e4bd59!important;color:#fff!important;
-  box-shadow:inset 0 0 24px rgba(242,192,73,.15),0 0 22px rgba(232,182,69,.32)!important;
-}
-#app .scorebar .player.active b,#app .scorebar .player.active .score,#app .scorebar .player.active .muted{color:#fff!important;text-shadow:none!important}
-@media(max-width:1200px){body.screen .wrap{left:300px}.cameraSafe{width:276px!important}}
+    <style>
+      .imageRevealWrap {
+        width: min(100%, 620px);
+        max-width: 620px;
+        margin: 12px auto;
+        text-align: center;
+      }
+      .imageRevealFrame {
+        overflow: hidden;
+        border-radius: 18px;
+        border: 2px solid rgba(255, 255, 255, 0.18);
+        background: #090514;
+        box-shadow: 0 16px 50px rgba(0, 0, 0, 0.42);
+      }
+      .imageRevealImg {
+        display: block;
+        width: 100%;
+        max-height: 38vh;
+        object-fit: contain;
+        transition:
+          filter 0.65s ease,
+          transform 0.65s ease;
+      }
+      .imageRevealValue {
+        display: inline-block;
+        margin: 0 0 12px;
+        padding: 8px 18px;
+        border-radius: 999px;
+        font-weight: 900;
+        font-size: clamp(24px, 3vw, 42px);
+        background: rgba(255, 196, 0, 0.14);
+        border: 1px solid rgba(255, 215, 70, 0.45);
+      }
+      .emojiQuestion {
+        font-size: clamp(64px, 8vw, 118px);
+        line-height: 1.2;
+        text-align: center;
+        letter-spacing: 0.14em;
+        padding: 8px 10px;
+        white-space: normal;
+      }
+    </style>
+    <style>
+      /* v1.6.9 — permanent OBS camera-safe area */
+      body.screen .wrap {
+        max-width: none;
+        padding-left: 340px;
+        padding-right: 24px;
+        box-sizing: border-box;
+      }
+      .cameraSafe {
+        position: fixed;
+        left: 18px;
+        top: 18px;
+        width: 292px;
+        aspect-ratio: 16/9;
+        border: 2px dashed rgba(255, 255, 255, 0.22);
+        border-radius: 18px;
+        background: rgba(0, 0, 0, 0.16);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 900;
+        letter-spacing: 0.12em;
+        color: rgba(255, 255, 255, 0.28);
+        z-index: 0;
+      }
+      .imageRevealWrap {
+        max-width: 1180px;
+        margin: 8px auto;
+      }
+      .imageRevealImg {
+        width: 100%;
+        height: auto;
+        max-height: 64vh;
+        object-fit: contain;
+      }
+      .imageRevealFrame {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .audQr {
+        width: min(300px, 24vw);
+        background: white;
+        padding: 10px;
+        border-radius: 18px;
+      }
+      .audGrid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 12px;
+        max-width: 1000px;
+        margin: 18px auto;
+      }
+      .audOpt {
+        padding: 16px;
+        border-radius: 14px;
+        background: rgba(255, 255, 255, 0.08);
+        font-size: 24px;
+        font-weight: 800;
+      }
+      @media (max-width: 1200px) {
+        body.screen .wrap {
+          padding-left: 300px;
+        }
+        .cameraSafe {
+          width: 250px;
+        }
+      }
+    </style>
+    <style>
+      /* v3.1 Active Speaker: highlight the EXISTING score cards, no separate overlay. */
+      #app .scorebar .player.voice-speaking {
+        border-color: #a78bfa !important;
+        outline: 3px solid #a78bfa !important;
+        outline-offset: -3px !important;
+        background: rgba(124, 58, 237, 0.35) !important;
+        box-shadow:
+          0 0 0 3px rgba(167, 139, 250, 0.22),
+          0 0 28px rgba(167, 139, 250, 0.65) !important;
+        transform: none !important;
+        transition:
+          background 0.12s,
+          outline-color 0.12s,
+          box-shadow 0.12s;
+      }
+      /* OBS v3 test layout: fixed camera block + four right-side gameplay segments. */
+      body.screen {
+        overflow: hidden;
+      }
+      body.screen .wrap {
+        position: fixed;
+        left: 340px;
+        right: 24px;
+        top: 0;
+        bottom: 0;
+        padding: 12px 0 !important;
+        max-width: none;
+        box-sizing: border-box;
+      }
+      .cameraSafe {
+        position: fixed !important;
+        left: 0 !important;
+        top: 0 !important;
+        bottom: 0 !important;
+        width: 316px !important;
+        height: 100vh !important;
+        aspect-ratio: auto !important;
+        border-radius: 0 !important;
+        box-sizing: border-box;
+      }
+      #app {
+        height: 100%;
+      }
+      .obsGameLayout {
+        height: 100%;
+        display: grid;
+        grid-template-rows: minmax(0, 1fr) auto 92px 112px;
+        gap: 8px;
+        min-height: 0;
+      }
+      .obsSegment {
+        min-width: 0;
+        min-height: 0;
+        box-sizing: border-box;
+        border-radius: 14px;
+      }
+      .obsSegmentQuestion {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        overflow: hidden;
+      }
+      .obsSegmentQuestion .question {
+        margin: 0 !important;
+        width: 100%;
+        box-sizing: border-box;
+      }
+      .obsSegmentMedia {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        max-height: 50vh;
+        overflow: visible;
+      }
+      .obsSegmentMedia:empty {
+        display: none;
+      }
+      .obsSegmentMedia .media-question {
+        margin: 0 auto !important;
+        width: 100%;
+        height: auto !important;
+        box-sizing: border-box;
+      }
+      .obsSegmentMedia .media-question audio {
+        display: block;
+        width: 100% !important;
+        height: 54px !important;
+      }
+      .obsSegmentMedia .imageRevealWrap {
+        margin: 0 auto !important;
+        width: 100%;
+        height: auto !important;
+        max-height: 50vh;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        box-sizing: border-box;
+      }
+      .obsSegmentMedia .imageRevealFrame {
+        width: 100%;
+        height: min(38vh, 420px) !important;
+        max-height: calc(50vh - 42px);
+        overflow: hidden !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+      }
+      .obsSegmentMedia .imageRevealFrame .imageRevealImg {
+        width: 100% !important;
+        height: 100% !important;
+        max-width: 100% !important;
+        max-height: 100% !important;
+        object-fit: contain !important;
+        object-position: center center !important;
+        transform: none !important;
+      }
+      .obsSegmentMedia .quizMedia,
+      .obsSegmentMedia .imageRevealImg,
+      .obsSegmentMedia img {
+        display: block;
+        width: auto !important;
+        max-width: 100% !important;
+        height: auto !important;
+        max-height: calc(50vh - 42px) !important;
+        object-fit: contain !important;
+        object-position: center center !important;
+        transform-origin: center center !important;
+        margin: auto;
+      }
+      .obsSegmentMedia .imageRevealImg {
+        transform: none !important;
+      }
+      .obsSegmentAnswer {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        overflow: hidden;
+        padding: 6px 12px;
+      }
+      .obsSegmentAnswer.is-empty {
+        visibility: hidden !important;
+        border: 0 !important;
+        background: transparent !important;
+        box-shadow: none !important;
+        padding: 0 !important;
+      }
+      .obsSegmentAnswer .answer {
+        margin: 0 !important;
+        width: 100%;
+        text-align: center;
+      }
+      .obsSegmentPlayers {
+        display: flex;
+        align-items: stretch;
+        overflow: hidden;
+      }
+      .obsSegmentPlayers .scorebar {
+        width: 100%;
+        height: 100%;
+        margin: 0 !important;
+        align-items: stretch;
+      }
+      .obsSegmentPlayers .scorebar .player {
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        box-sizing: border-box;
+      }
+      .obsSegmentPlayers .scorebar .player.active {
+        outline: none !important;
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.035) !important;
+      }
+      #app .scorebar .player.active,
+      #app .scorebar .player.active.voice-speaking {
+        background: linear-gradient(150deg, #665027, #453618) !important;
+        border-color: #e4bd59 !important;
+        color: #fff !important;
+        box-shadow:
+          inset 0 0 24px rgba(242, 192, 73, 0.15),
+          0 0 22px rgba(232, 182, 69, 0.32) !important;
+      }
+      #app .scorebar .player.active b,
+      #app .scorebar .player.active .score,
+      #app .scorebar .player.active .muted {
+        color: #fff !important;
+        text-shadow: none !important;
+      }
+      @media (max-width: 1200px) {
+        body.screen .wrap {
+          left: 300px;
+        }
+        .cameraSafe {
+          width: 276px !important;
+        }
+      }
 
-/* UI-03: Duo VS inside the established OBS four-part layout. */
-.duelStage{width:100%;max-width:100%;display:flex;flex-direction:column;align-items:center;gap:clamp(5px,.9vh,10px);margin:0 auto}
-.duelHeading{color:#ffd86b;font-weight:900;font-size:clamp(19px,2.4vw,33px);letter-spacing:.14em;line-height:1.05;text-shadow:0 0 20px rgba(255,208,93,.3)}
-.duelMatchup{display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);align-items:center;gap:clamp(6px,1.3vw,18px);width:min(100%,850px);margin:0 auto}
-.duelFighter{min-width:0;box-sizing:border-box;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;min-height:clamp(72px,10vh,112px);padding:clamp(7px,1.2vh,14px);border:2px solid #795aa7;border-radius:14px;background:linear-gradient(150deg,#332247,#251936);color:#fff;text-align:center;box-shadow:inset 0 1px 0 rgba(255,255,255,.06);transition:background .2s,border-color .2s,box-shadow .2s}
-.duelFighter-role{font-size:clamp(11px,.95vw,15px);font-weight:800;letter-spacing:.06em;color:#e4c8ff}
-.duelFighter-name{width:100%;font-size:clamp(17px,1.85vw,27px);line-height:1.12;font-weight:900;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#fff}
-.duelFighter-score{font-size:clamp(18px,2vw,27px);font-weight:900;line-height:1.06;color:#fff}
-.duelVersus{font-size:clamp(24px,3vw,44px);font-weight:1000;color:#ffd86b;line-height:1;text-shadow:0 0 20px rgba(255,204,80,.5)}
-.duelFighter.is-waiting{border-style:dashed;opacity:.8}
-.duelFighter.is-answering{background:linear-gradient(150deg,#665027,#453618)!important;border-color:#e4bd59!important;box-shadow:inset 0 0 24px rgba(242,192,73,.15),0 0 20px rgba(232,182,69,.35)!important}
-.duelFighter.is-answering .duelFighter-role,.duelFighter.is-answering .duelFighter-name,.duelFighter.is-answering .duelFighter-score{color:#fff!important}
-.duelFighter.voice-speaking{outline:3px solid #ad8bff;outline-offset:0;box-shadow:0 0 25px rgba(167,139,250,.4)}
-.duelFighter.is-answering.voice-speaking{outline:3px solid #ad8bff;outline-offset:0}
-.duelFighter.duelEntrance{animation:duelOpponentReveal .7s ease-out both}
-@keyframes duelOpponentReveal{0%{opacity:0;transform:translateX(15px) scale(.92)}70%{opacity:1;transform:translateX(-2px) scale(1.02)}100%{opacity:1;transform:translateX(0) scale(1)}}
-@media(prefers-reduced-motion:reduce){.duelFighter.duelEntrance{animation:none!important}}
+      /* UI-03: Duo VS inside the established OBS four-part layout. */
+      .duelStage {
+        width: 100%;
+        max-width: 100%;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: clamp(5px, 0.9vh, 10px);
+        margin: 0 auto;
+      }
+      .duelHeading {
+        color: #ffd86b;
+        font-weight: 900;
+        font-size: clamp(19px, 2.4vw, 33px);
+        letter-spacing: 0.14em;
+        line-height: 1.05;
+        text-shadow: 0 0 20px rgba(255, 208, 93, 0.3);
+      }
+      .duelMatchup {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+        align-items: center;
+        gap: clamp(6px, 1.3vw, 18px);
+        width: min(100%, 850px);
+        margin: 0 auto;
+      }
+      .duelFighter {
+        min-width: 0;
+        box-sizing: border-box;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 3px;
+        min-height: clamp(72px, 10vh, 112px);
+        padding: clamp(7px, 1.2vh, 14px);
+        border: 2px solid #795aa7;
+        border-radius: 14px;
+        background: linear-gradient(150deg, #332247, #251936);
+        color: #fff;
+        text-align: center;
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+        transition:
+          background 0.2s,
+          border-color 0.2s,
+          box-shadow 0.2s;
+      }
+      .duelFighter-role {
+        font-size: clamp(11px, 0.95vw, 15px);
+        font-weight: 800;
+        letter-spacing: 0.06em;
+        color: #e4c8ff;
+      }
+      .duelFighter-name {
+        width: 100%;
+        font-size: clamp(17px, 1.85vw, 27px);
+        line-height: 1.12;
+        font-weight: 900;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        color: #fff;
+      }
+      .duelFighter-score {
+        font-size: clamp(18px, 2vw, 27px);
+        font-weight: 900;
+        line-height: 1.06;
+        color: #fff;
+      }
+      .duelVersus {
+        font-size: clamp(24px, 3vw, 44px);
+        font-weight: 1000;
+        color: #ffd86b;
+        line-height: 1;
+        text-shadow: 0 0 20px rgba(255, 204, 80, 0.5);
+      }
+      .duelFighter.is-waiting {
+        border-style: dashed;
+        opacity: 0.8;
+      }
+      .duelFighter.is-answering {
+        background: linear-gradient(150deg, #665027, #453618) !important;
+        border-color: #e4bd59 !important;
+        box-shadow:
+          inset 0 0 24px rgba(242, 192, 73, 0.15),
+          0 0 20px rgba(232, 182, 69, 0.35) !important;
+      }
+      .duelFighter.is-answering .duelFighter-role,
+      .duelFighter.is-answering .duelFighter-name,
+      .duelFighter.is-answering .duelFighter-score {
+        color: #fff !important;
+      }
+      .duelFighter.voice-speaking {
+        outline: 3px solid #ad8bff;
+        outline-offset: 0;
+        box-shadow: 0 0 25px rgba(167, 139, 250, 0.4);
+      }
+      .duelFighter.is-answering.voice-speaking {
+        outline: 3px solid #ad8bff;
+        outline-offset: 0;
+      }
+      .duelFighter.duelEntrance {
+        animation: duelOpponentReveal 0.7s ease-out both;
+      }
+      @keyframes duelOpponentReveal {
+        0% {
+          opacity: 0;
+          transform: translateX(15px) scale(0.92);
+        }
+        70% {
+          opacity: 1;
+          transform: translateX(-2px) scale(1.02);
+        }
+        100% {
+          opacity: 1;
+          transform: translateX(0) scale(1);
+        }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .duelFighter.duelEntrance {
+          animation: none !important;
+        }
+      }
 
+      /* UI-04: show the chosen Cat in the Bag answerer above the question in OBS. */
+      .catAnswererLabel {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: clamp(5px, 0.8vw, 12px);
+        max-width: 100%;
+        text-align: center;
+        margin: clamp(3px, 0.7vh, 8px) auto 0;
+        padding: clamp(6px, 0.8vh, 10px) clamp(12px, 1.6vw, 22px);
+        border: 1px solid rgba(255, 215, 111, 0.56);
+        border-radius: 12px;
+        background: rgba(255, 204, 84, 0.12);
+        color: #fff;
+        font-size: clamp(18px, 1.8vw, 29px);
+        line-height: 1.17;
+        font-weight: 800;
+      }
+      .catAnswererLabel b {
+        color: #fff;
+        font-size: 1.12em;
+        overflow-wrap: anywhere;
+      }
 
-/* UI-04: show the chosen Cat in the Bag answerer above the question in OBS. */
-.catAnswererLabel{display:flex;justify-content:center;align-items:center;flex-wrap:wrap;gap:clamp(5px,.8vw,12px);max-width:100%;text-align:center;margin:clamp(3px,.7vh,8px) auto 0;padding:clamp(6px,.8vh,10px) clamp(12px,1.6vw,22px);border:1px solid rgba(255,215,111,.56);border-radius:12px;background:rgba(255,204,84,.12);color:#fff;font-size:clamp(18px,1.8vw,29px);line-height:1.17;font-weight:800}
-.catAnswererLabel b{color:#fff;font-size:1.12em;overflow-wrap:anywhere}
+      /* UI-05: compact VA-BANK speaker and wager in OBS without changing four segments. */
+      .vaBankStage {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: clamp(5px, 0.8vh, 10px);
+        width: 100%;
+        max-width: 100%;
+        margin: 0 auto;
+      }
+      .vaBankHeading {
+        color: #ffd86b;
+        font-size: clamp(22px, 2.3vw, 34px);
+        font-weight: 900;
+        letter-spacing: 0.1em;
+        line-height: 1.12;
+        text-shadow: 0 0 16px rgba(255, 210, 75, 0.24);
+      }
+      .vaBankInfo {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 4px;
+        width: min(100%, 760px);
+        max-width: 100%;
+        box-sizing: border-box;
+        padding: clamp(8px, 1vh, 12px) clamp(12px, 1.5vw, 22px);
+        border: 1px solid rgba(255, 215, 111, 0.62);
+        border-radius: 14px;
+        background: linear-gradient(150deg, rgba(115, 83, 34, 0.55), rgba(67, 48, 23, 0.56));
+        text-align: center;
+        overflow-wrap: anywhere;
+      }
+      .vaBankAnswerer {
+        color: #fff;
+        line-height: 1.2;
+        font-size: clamp(18px, 1.8vw, 29px);
+        font-weight: 800;
+      }
+      .vaBankAnswerer b {
+        color: #fff;
+        font-size: 1.08em;
+      }
+      .vaBankStake {
+        color: #ffdc79;
+        font-size: clamp(16px, 1.55vw, 24px);
+        line-height: 1.2;
+        font-weight: 900;
+      }
 
-/* UI-05: compact VA-BANK speaker and wager in OBS without changing four segments. */
-.vaBankStage{display:flex;flex-direction:column;align-items:center;gap:clamp(5px,.8vh,10px);width:100%;max-width:100%;margin:0 auto}
-.vaBankHeading{color:#ffd86b;font-size:clamp(22px,2.3vw,34px);font-weight:900;letter-spacing:.1em;line-height:1.12;text-shadow:0 0 16px rgba(255,210,75,.24)}
-.vaBankInfo{display:flex;flex-direction:column;align-items:center;gap:4px;width:min(100%,760px);max-width:100%;box-sizing:border-box;padding:clamp(8px,1vh,12px) clamp(12px,1.5vw,22px);border:1px solid rgba(255,215,111,.62);border-radius:14px;background:linear-gradient(150deg,rgba(115,83,34,.55),rgba(67,48,23,.56));text-align:center;overflow-wrap:anywhere}
-.vaBankAnswerer{color:#fff;line-height:1.2;font-size:clamp(18px,1.8vw,29px);font-weight:800}
-.vaBankAnswerer b{color:#fff;font-size:1.08em}
-.vaBankStake{color:#ffdc79;font-size:clamp(16px,1.55vw,24px);line-height:1.2;font-weight:900}
+      /* UI-06: Triplet three-challenge story in the existing OBS question segment. */
+      .tripletStage {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: clamp(5px, 0.8vh, 10px);
+        width: 100%;
+        max-width: 100%;
+        min-width: 0;
+        margin: 0 auto;
+      }
+      .tripletTitle {
+        color: #ffd275;
+        font-weight: 900;
+        letter-spacing: 0.07em;
+        font-size: clamp(21px, 2.4vw, 34px);
+        line-height: 1.1;
+        text-align: center;
+        text-shadow: 0 0 14px rgba(255, 197, 70, 0.3);
+      }
+      .tripletSubtitle {
+        color: #d7c3ee;
+        font-size: clamp(12px, 1.2vw, 18px);
+        font-weight: 800;
+        text-align: center;
+      }
+      .tripletSteps {
+        display: grid;
+        grid-template-columns: repeat(var(--triplet-count, 3), minmax(0, 1fr));
+        gap: clamp(5px, 0.8vw, 12px);
+        width: min(100%, 900px);
+        min-width: 0;
+      }
+      .tripletStep {
+        min-width: 0;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        gap: 3px;
+        padding: clamp(6px, 0.9vh, 10px) 4px;
+        min-height: clamp(72px, 10vh, 104px);
+        border: 1px solid #61526f;
+        border-radius: 12px;
+        background: #292035;
+        color: white;
+        text-align: center;
+        box-sizing: border-box;
+        transition:
+          background 0.2s,
+          border-color 0.2s;
+      }
+      .tripletStep.is-current {
+        background: linear-gradient(150deg, #674b22, #3c2c1a);
+        border: 2px solid #ffdb77;
+        box-shadow: 0 0 18px rgba(255, 207, 93, 0.4);
+        animation: tripletStageEnter 0.55s ease-out both;
+      }
+      .tripletStep.is-correct {
+        background: linear-gradient(145deg, #284b37, #1f3328);
+        border-color: #80d9a0;
+      }
+      .tripletStep.is-wrong {
+        background: linear-gradient(145deg, #593039, #381f2c);
+        border-color: #df8d97;
+      }
+      .tripletStep.is-final.is-current {
+        animation: tripletLastGlow 1.8s ease-in-out infinite alternate;
+      }
+      .tripletStep-label {
+        font-size: clamp(11px, 1.05vw, 15px);
+        font-weight: 800;
+        color: #fff;
+      }
+      .tripletStep-value {
+        font-size: clamp(18px, 2vw, 28px);
+        line-height: 1.05;
+        font-weight: 900;
+        color: #fff;
+      }
+      .tripletStep-status {
+        font-size: clamp(11px, 1vw, 16px);
+        font-weight: 900;
+        color: #fff;
+      }
+      .tripletPlayer {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 5px 10px;
+        justify-content: center;
+        align-items: center;
+        width: min(100%, 760px);
+        padding: clamp(6px, 0.8vh, 9px) 12px;
+        background: rgba(112, 65, 145, 0.22);
+        border: 1px solid rgba(177, 129, 224, 0.65);
+        border-radius: 12px;
+        box-sizing: border-box;
+        font-size: clamp(15px, 1.45vw, 23px);
+        line-height: 1.15;
+      }
+      .tripletPlayer span {
+        font-size: 0.74em;
+        color: #d7c3ee;
+        font-weight: 800;
+      }
+      .tripletPlayer b {
+        color: #fff;
+        overflow-wrap: anywhere;
+        min-width: 0;
+      }
+      .tripletNet {
+        font-size: clamp(18px, 2vw, 29px);
+        font-weight: 900;
+        line-height: 1.1;
+        color: #ffd275;
+        text-align: center;
+      }
+      .tripletNet.negative {
+        color: #ffacb4;
+      }
+      .tripletSummaryText {
+        font-weight: 900;
+        letter-spacing: 0.1em;
+        font-size: clamp(16px, 1.7vw, 26px);
+        color: #fff;
+        text-align: center;
+      }
+      @keyframes tripletStageEnter {
+        from {
+          opacity: 0.55;
+          transform: scale(0.94);
+        }
+        to {
+          opacity: 1;
+          transform: scale(1);
+        }
+      }
+      @keyframes tripletLastGlow {
+        from {
+          box-shadow: 0 0 10px rgba(255, 207, 93, 0.35);
+        }
+        to {
+          box-shadow: 0 0 27px rgba(255, 207, 93, 0.82);
+        }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .tripletStep.is-current,
+        .tripletStep.is-final.is-current {
+          animation: none !important;
+        }
+      }
+    </style>
+    <style>
+      .seasonChampionStage {
+        position: relative;
+        overflow: hidden;
+        isolation: isolate;
+      }
+      .seasonChampionStage > * {
+        position: relative;
+        z-index: 2;
+      }
+      .seasonConfetti {
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+        z-index: 1;
+        overflow: hidden;
+      }
+      .seasonConfetti i {
+        position: absolute;
+        top: -12vh;
+        width: 10px;
+        height: 22px;
+        border-radius: 3px;
+        background: hsl(var(--h), 90%, 60%);
+        left: var(--x);
+        animation: seasonConfettiFall var(--d) linear infinite;
+        animation-delay: var(--delay);
+        transform: rotate(var(--r));
+      }
+      .seasonConfetti .pop {
+        top: auto;
+        bottom: 4%;
+        width: 12px;
+        height: 12px;
+        border-radius: 50%;
+        animation: seasonPop 1.25s ease-out infinite;
+        animation-delay: var(--delay);
+      }
+      .seasonCannon {
+        position: absolute;
+        bottom: 2%;
+        font-size: clamp(52px, 6vw, 88px);
+        z-index: 3;
+        filter: drop-shadow(0 0 18px rgba(255, 210, 70, 0.45));
+        animation: seasonCannonKick 1.25s ease-in-out infinite;
+      }
+      .seasonCannon.left {
+        left: 2%;
+        transform: rotate(25deg);
+      }
+      .seasonCannon.right {
+        right: 2%;
+        transform: scaleX(-1) rotate(25deg);
+      }
+      @keyframes seasonConfettiFall {
+        0% {
+          transform: translateY(-10vh) rotate(0deg);
+          opacity: 0;
+        }
+        10% {
+          opacity: 1;
+        }
+        100% {
+          transform: translateY(115vh) rotate(720deg);
+          opacity: 0.9;
+        }
+      }
+      @keyframes seasonPop {
+        0% {
+          transform: translate(0, 0) scale(0.2);
+          opacity: 0;
+        }
+        15% {
+          opacity: 1;
+        }
+        100% {
+          transform: translate(var(--dx), var(--dy)) scale(1);
+          opacity: 0;
+        }
+      }
+      @keyframes seasonCannonKick {
+        0%,
+        100% {
+          margin-bottom: 0;
+        }
+        12% {
+          margin-bottom: 12px;
+        }
+        24% {
+          margin-bottom: 0;
+        }
+      }
+    </style>
+  </head>
+  <body class="screen">
+    <div class="cameraSafe"></div>
+    <div class="wrap">
+      <div id="app">
+        <div class="panel center"><h2>Підключення до кімнати…</h2></div>
+      </div>
+    </div>
+    <script>
+      const socket = io(),
+        app = document.getElementById("app");
+      const cueAudio = {
+        question: new Audio("/sounds/question.mp3"),
+        buzz_open: new Audio("/sounds/buzz.mp3"),
+      };
+      Object.values(cueAudio).forEach(a => {
+        a.preload = "auto";
+      });
+      function playCueSound(type) {
+        const key = type === "gong" ? "question" : type;
+        const a = cueAudio[key];
+        if (!a) return;
+        try {
+          a.pause();
+          a.currentTime = 0;
+          const p = a.play();
+          if (p && p.catch) p.catch(() => {});
+        } catch (e) {}
+      }
+      // Final ceremony music plays only in the OBS screen, not on player devices.
+      const finalMusic = {
+        results_theme: new Audio("/media/results_theme.mp3"),
+        winner_theme: new Audio("/media/winner_theme.mp3"),
+      };
+      let activeFinalMusic = null;
+      Object.values(finalMusic).forEach(a => {
+        a.preload = "auto";
+        a.volume = 0.35;
+      });
+      function handleFinalMusic(type) {
+        if (!["results_theme", "winner_theme", "final_music_stop"].includes(type)) return false;
+        for (const a of Object.values(finalMusic)) {
+          a.pause();
+          a.currentTime = 0;
+        }
+        activeFinalMusic = null;
+        if (type !== "final_music_stop") {
+          const a = finalMusic[type];
+          activeFinalMusic = a;
+          a.play().catch(err => console.warn("OBS final music playback blocked:", err));
+        }
+        return true;
+      }
+      const obsMurlocAudio = new Audio("/media/murloc.mp3");
+      obsMurlocAudio.preload = "auto";
+      socket.on("cue", e => {
+        if (e?.type === "murloc_answer") {
+          if (state?.phase !== "result" || state.current?.sponsorDouble !== true) return;
+          obsMurlocAudio.pause();
+          obsMurlocAudio.currentTime = 0;
+          obsMurlocAudio.play().catch(err => console.warn("OBS Murloc audio:", err));
+          return;
+        }
+        if (!handleFinalMusic(e?.type)) playCueSound(e?.type);
+      });
+      let data = null,
+        state = null,
+        loadedGameId = "";
 
-/* UI-06: Triplet three-challenge story in the existing OBS question segment. */
-.tripletStage{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:clamp(5px,.8vh,10px);width:100%;max-width:100%;min-width:0;margin:0 auto}
-.tripletTitle{color:#ffd275;font-weight:900;letter-spacing:.07em;font-size:clamp(21px,2.4vw,34px);line-height:1.1;text-align:center;text-shadow:0 0 14px rgba(255,197,70,.3)}
-.tripletSubtitle{color:#d7c3ee;font-size:clamp(12px,1.2vw,18px);font-weight:800;text-align:center}
-.tripletSteps{display:grid;grid-template-columns:repeat(var(--triplet-count,3),minmax(0,1fr));gap:clamp(5px,.8vw,12px);width:min(100%,900px);min-width:0}
-.tripletStep{min-width:0;display:flex;flex-direction:column;justify-content:center;align-items:center;gap:3px;padding:clamp(6px,.9vh,10px) 4px;min-height:clamp(72px,10vh,104px);border:1px solid #61526f;border-radius:12px;background:#292035;color:white;text-align:center;box-sizing:border-box;transition:background .2s,border-color .2s}
-.tripletStep.is-current{background:linear-gradient(150deg,#674b22,#3c2c1a);border:2px solid #ffdb77;box-shadow:0 0 18px rgba(255,207,93,.4);animation:tripletStageEnter .55s ease-out both}
-.tripletStep.is-correct{background:linear-gradient(145deg,#284b37,#1f3328);border-color:#80d9a0}
-.tripletStep.is-wrong{background:linear-gradient(145deg,#593039,#381f2c);border-color:#df8d97}
-.tripletStep.is-final.is-current{animation:tripletLastGlow 1.8s ease-in-out infinite alternate}
-.tripletStep-label{font-size:clamp(11px,1.05vw,15px);font-weight:800;color:#fff}
-.tripletStep-value{font-size:clamp(18px,2vw,28px);line-height:1.05;font-weight:900;color:#fff}
-.tripletStep-status{font-size:clamp(11px,1vw,16px);font-weight:900;color:#fff}
-.tripletPlayer{display:flex;flex-wrap:wrap;gap:5px 10px;justify-content:center;align-items:center;width:min(100%,760px);padding:clamp(6px,.8vh,9px) 12px;background:rgba(112,65,145,.22);border:1px solid rgba(177,129,224,.65);border-radius:12px;box-sizing:border-box;font-size:clamp(15px,1.45vw,23px);line-height:1.15}
-.tripletPlayer span{font-size:.74em;color:#d7c3ee;font-weight:800}
-.tripletPlayer b{color:#fff;overflow-wrap:anywhere;min-width:0}
-.tripletNet{font-size:clamp(18px,2vw,29px);font-weight:900;line-height:1.1;color:#ffd275;text-align:center}
-.tripletNet.negative{color:#ffacb4}
-.tripletSummaryText{font-weight:900;letter-spacing:.1em;font-size:clamp(16px,1.7vw,26px);color:#fff;text-align:center}
-@keyframes tripletStageEnter{from{opacity:.55;transform:scale(.94)}to{opacity:1;transform:scale(1)}}
-@keyframes tripletLastGlow{from{box-shadow:0 0 10px rgba(255,207,93,.35)}to{box-shadow:0 0 27px rgba(255,207,93,.82)}}
-@media(prefers-reduced-motion:reduce){.tripletStep.is-current,.tripletStep.is-final.is-current{animation:none!important}}
-</style>
-<style>
-.seasonChampionStage{position:relative;overflow:hidden;isolation:isolate}.seasonChampionStage>*{position:relative;z-index:2}.seasonConfetti{position:absolute;inset:0;pointer-events:none;z-index:1;overflow:hidden}.seasonConfetti i{position:absolute;top:-12vh;width:10px;height:22px;border-radius:3px;background:hsl(var(--h),90%,60%);left:var(--x);animation:seasonConfettiFall var(--d) linear infinite;animation-delay:var(--delay);transform:rotate(var(--r))}.seasonConfetti .pop{top:auto;bottom:4%;width:12px;height:12px;border-radius:50%;animation:seasonPop 1.25s ease-out infinite;animation-delay:var(--delay)}.seasonCannon{position:absolute;bottom:2%;font-size:clamp(52px,6vw,88px);z-index:3;filter:drop-shadow(0 0 18px rgba(255,210,70,.45));animation:seasonCannonKick 1.25s ease-in-out infinite}.seasonCannon.left{left:2%;transform:rotate(25deg)}.seasonCannon.right{right:2%;transform:scaleX(-1) rotate(25deg)}@keyframes seasonConfettiFall{0%{transform:translateY(-10vh) rotate(0deg);opacity:0}10%{opacity:1}100%{transform:translateY(115vh) rotate(720deg);opacity:.9}}@keyframes seasonPop{0%{transform:translate(0,0) scale(.2);opacity:0}15%{opacity:1}100%{transform:translate(var(--dx),var(--dy)) scale(1);opacity:0}}@keyframes seasonCannonKick{0%,100%{margin-bottom:0}12%{margin-bottom:12px}24%{margin-bottom:0}}
-</style>
-</head><body class="screen"><div class="cameraSafe"></div><div class="wrap"><div id="app"><div class="panel center"><h2>Підключення до кімнати…</h2></div></div></div><script>
-const socket=io(),app=document.getElementById('app');
-const cueAudio={
- question:new Audio('/sounds/question.mp3'),
- buzz_open:new Audio('/sounds/buzz.mp3')
-};
-Object.values(cueAudio).forEach(a=>{a.preload='auto';});
-function playCueSound(type){
- const key=type==='gong'?'question':type;
- const a=cueAudio[key];
- if(!a)return;
- try{
-  a.pause();
-  a.currentTime=0;
-  const p=a.play();
-  if(p&&p.catch)p.catch(()=>{});
- }catch(e){}
-}
-// Final ceremony music plays only in the OBS screen, not on player devices.
-const finalMusic={
- results_theme:new Audio('/media/results_theme.mp3'),
- winner_theme:new Audio('/media/winner_theme.mp3')
-};
-let activeFinalMusic=null;
-Object.values(finalMusic).forEach(a=>{a.preload='auto';a.volume=0.35;});
-function handleFinalMusic(type){
- if(!['results_theme','winner_theme','final_music_stop'].includes(type))return false;
- for(const a of Object.values(finalMusic)){a.pause();a.currentTime=0;}
- activeFinalMusic=null;
- if(type!=='final_music_stop'){
-  const a=finalMusic[type];activeFinalMusic=a;
-  a.play().catch(err=>console.warn('OBS final music playback blocked:',err));
- }
- return true;
-}
-const obsMurlocAudio=new Audio('/media/murloc.mp3');obsMurlocAudio.preload='auto';
-socket.on('cue',e=>{if(e?.type==='murloc_answer'){if(state?.phase!=='result'||state.current?.sponsorDouble!==true)return;obsMurlocAudio.pause();obsMurlocAudio.currentTime=0;obsMurlocAudio.play().catch(err=>console.warn('OBS Murloc audio:',err));return;}if(!handleFinalMusic(e?.type))playCueSound(e?.type);});
-let data=null,state=null,loadedGameId='';
+      let firstTurnClockHandle = null;
+      function armFirstTurnClock() {
+        if (firstTurnClockHandle) {
+          clearInterval(firstTurnClockHandle);
+          firstTurnClockHandle = null;
+        }
+        const el = document.getElementById("firstTurnTimer");
+        const remaining = Number(state?.firstTurnQuiz?.remainingMs || 0);
+        if (!el || remaining <= 0 || state?.firstTurnQuiz?.timerStatus !== "running") return;
+        const end = Date.now() + remaining;
+        const tick = () => {
+          const left = Math.max(0, Math.ceil((end - Date.now()) / 1000));
+          el.textContent = String(left);
+          if (left <= 0 && firstTurnClockHandle) {
+            clearInterval(firstTurnClockHandle);
+            firstTurnClockHandle = null;
+          }
+        };
+        tick();
+        firstTurnClockHandle = setInterval(tick, 200);
+      }
+      let code =
+        location.pathname.split("/").filter(Boolean)[1] || new URLSearchParams(location.search).get("code") || "";
+      async function ensureGameData(gameId) {
+        if (!gameId || gameId === loadedGameId) return;
+        const r = await fetch(`/games/${encodeURIComponent(gameId)}.json`, { cache: "no-store" });
+        if (!r.ok) throw new Error("Game HTTP " + r.status);
+        data = await r.json();
+        loadedGameId = gameId;
+      }
+      function setObsNet(ok) {
+        const el = document.getElementById("obsNet");
+        if (el) {
+          el.textContent = ok ? "🟢 LIVE" : "🔴 OFFLINE";
+          el.style.opacity = ok ? ".45" : "1";
+        }
+      }
+      function joinObs() {
+        if (!code) return;
+        socket.emit("joinScreen", { code }, r => {
+          if (!r?.ok) app.innerHTML = `<div class="panel center"><h2>${r?.error || "Кімнату не знайдено."}</h2></div>`;
+        });
+      }
+      if (!code)
+        app.innerHTML = `<div class="panel center"><h2>Вкажіть кімнату</h2><p>Використайте адресу <b>/screen/КОД</b></p></div>`;
+      socket.on("connect", () => {
+        setObsNet(true);
+        if (code) joinObs();
+      });
+      socket.on("disconnect", () => setObsNet(false));
+      socket.on("roomClosed", ({ code: closedCode }) => {
+        if (closedCode !== code) return;
+        const last = state;
+        state = null;
+        const rs = last?.finalResults || [];
+        const w = rs[0];
+        app.innerHTML = `<div class="panel center" style="margin-top:3vh"><div class="huge">🏁</div><h1 style="font-size:52px">ГРУ ЗАВЕРШЕНО</h1>${w ? `<h2>🏆 ПЕРЕМОЖЕЦЬ</h2><div class="winner" style="font-size:72px">${GameUI.esc(w.name)}</div><div class="huge">${w.score}</div><div class="finalList">${rs.map((x, i) => `<div class="finalItem"><span><b>${i + 1}. ${GameUI.esc(x.name)}</b></span><b>${x.score}</b></div>`).join("")}</div>` : ""}</div>`;
+      });
 
-let firstTurnClockHandle=null;
-function armFirstTurnClock(){
-  if(firstTurnClockHandle){clearInterval(firstTurnClockHandle);firstTurnClockHandle=null}
-  const el=document.getElementById('firstTurnTimer');
-  const remaining=Number(state?.firstTurnQuiz?.remainingMs||0);
-  if(!el||remaining<=0||state?.firstTurnQuiz?.timerStatus!=='running')return;
-  const end=Date.now()+remaining;
-  const tick=()=>{
-    const left=Math.max(0,Math.ceil((end-Date.now())/1000));
-    el.textContent=String(left);
-    if(left<=0&&firstTurnClockHandle){clearInterval(firstTurnClockHandle);firstTurnClockHandle=null}
-  };
-  tick();
-  firstTurnClockHandle=setInterval(tick,200);
-}
-let code=location.pathname.split('/').filter(Boolean)[1]||new URLSearchParams(location.search).get('code')||'';
-async function ensureGameData(gameId){if(!gameId||gameId===loadedGameId)return;const r=await fetch(`/games/${encodeURIComponent(gameId)}.json`,{cache:'no-store'});if(!r.ok)throw new Error('Game HTTP '+r.status);data=await r.json();loadedGameId=gameId}
-function setObsNet(ok){const el=document.getElementById('obsNet');if(el){el.textContent=ok?'🟢 LIVE':'🔴 OFFLINE';el.style.opacity=ok?'.45':'1'}}
-function joinObs(){if(!code)return;socket.emit('joinScreen',{code},r=>{if(!r?.ok)app.innerHTML=`<div class="panel center"><h2>${r?.error||'Кімнату не знайдено.'}</h2></div>`})}
-if(!code)app.innerHTML=`<div class="panel center"><h2>Вкажіть кімнату</h2><p>Використайте адресу <b>/screen/КОД</b></p></div>`;
-socket.on('connect',()=>{setObsNet(true);if(code)joinObs()});
-socket.on('disconnect',()=>setObsNet(false));
-socket.on('roomClosed',({code:closedCode})=>{
- if(closedCode!==code)return;
- const last=state; state=null; const rs=last?.finalResults||[]; const w=rs[0];
- app.innerHTML=`<div class="panel center" style="margin-top:3vh"><div class="huge">🏁</div><h1 style="font-size:52px">ГРУ ЗАВЕРШЕНО</h1>${w?`<h2>🏆 ПЕРЕМОЖЕЦЬ</h2><div class="winner" style="font-size:72px">${GameUI.esc(w.name)}</div><div class="huge">${w.score}</div><div class="finalList">${rs.map((x,i)=>`<div class="finalItem"><span><b>${i+1}. ${GameUI.esc(x.name)}</b></span><b>${x.score}</b></div>`).join('')}</div>`:''}</div>`;
-});
+      /* Hold the final 3-stage recap for 2 seconds on OBS only. Never delay server gameplay. */
+      let tripletFinishPreview = null,
+        tripletFinishTimer = null;
+      socket.on("state", async s => {
+        if (code && s.code !== code) return;
+        const previous = state,
+          priorT = previous?.current?.triplet;
+        if (
+          previous?.phase === "triplet_result"
+          && s.phase === "board"
+          && previous.code === s.code
+          && priorT
+          && Number(priorT.index) === Number(priorT.total) - 1
+          && (priorT.results?.length || 0) >= Number(priorT.total || 3)
+        ) {
+          const respondent = previous.players?.find(p => p.id === priorT.answererId);
+          tripletFinishPreview = {
+            until: Date.now() + 2000,
+            triplet: priorT,
+            answererId: priorT.answererId,
+            name: respondent?.name || "—",
+          };
+          if (tripletFinishTimer) clearTimeout(tripletFinishTimer);
+          tripletFinishTimer = setTimeout(() => {
+            tripletFinishPreview = null;
+            tripletFinishTimer = null;
+            if (state?.phase === "board") render();
+          }, 2000);
+        } else if (s.phase !== "board" || s.selectedTile) {
+          tripletFinishPreview = null;
+          if (tripletFinishTimer) {
+            clearTimeout(tripletFinishTimer);
+            tripletFinishTimer = null;
+          }
+        }
+        state = s;
+        code = s.code;
+        try {
+          await ensureGameData(s.gameId);
+          render();
+        } catch (e) {
+          console.error(e);
+          app.innerHTML = '<div class="panel center"><h2>Помилка завантаження гри</h2></div>';
+        }
+      });
+      socket.on("voiceSpeaking", x => {
+        if (!state || x.code !== code) return;
+        state.voice = { ...(state.voice || {}), speakingPlayerIds: x.playerIds || [] };
+        applyVoiceHighlight();
+      });
+      socket.on("firstTurnProgress", x => {
+        if (!state || x.code !== code || state.phase !== "first_turn_quiz") return;
+        state.firstTurnQuiz.submittedPlayerIds = x.submittedPlayerIds || [];
+        if (Number.isFinite(Number(x.remainingMs))) state.firstTurnQuiz.remainingMs = Number(x.remainingMs);
+        if (x.timerStatus) state.firstTurnQuiz.timerStatus = x.timerStatus;
+        render();
+      });
+      socket.on("audienceProgress", x => {
+        if (!state || x.code !== code || !state.audience) return;
+        state.audience.joined = Number(x.joined || 0);
+        state.audience.submitted = Number(x.submitted || 0);
+        if (Number.isFinite(Number(x.remainingMs))) state.audience.remainingMs = Number(x.remainingMs);
+        const joined = document.getElementById("audienceJoined");
+        if (joined) joined.textContent = String(state.audience.joined);
+        const submitted = document.getElementById("audienceSubmitted");
+        if (submitted) submitted.textContent = `${state.audience.submitted}/${state.audience.joined}`;
+      });
 
-
-/* Hold the final 3-stage recap for 2 seconds on OBS only. Never delay server gameplay. */
-let tripletFinishPreview=null,tripletFinishTimer=null;
-socket.on('state',async s=>{
- if(code&&s.code!==code)return;
- const previous=state,priorT=previous?.current?.triplet;
- if(previous?.phase==='triplet_result'&&s.phase==='board'&&previous.code===s.code&&
-   priorT&&Number(priorT.index)===Number(priorT.total)-1&&
-   (priorT.results?.length||0)>=Number(priorT.total||3)){
-   const respondent=previous.players?.find(p=>p.id===priorT.answererId);
-   tripletFinishPreview={until:Date.now()+2000,triplet:priorT,answererId:priorT.answererId,name:respondent?.name||'—'};
-   if(tripletFinishTimer)clearTimeout(tripletFinishTimer);
-   tripletFinishTimer=setTimeout(()=>{
-     tripletFinishPreview=null;tripletFinishTimer=null;
-     if(state?.phase==='board')render();
-   },2000);
- }else if(s.phase!=='board'||s.selectedTile){
-   tripletFinishPreview=null;
-   if(tripletFinishTimer){clearTimeout(tripletFinishTimer);tripletFinishTimer=null;}
- }
- state=s;code=s.code;
- try{await ensureGameData(s.gameId);render()}
- catch(e){console.error(e);app.innerHTML='<div class="panel center"><h2>Помилка завантаження гри</h2></div>'}
-});
-socket.on('voiceSpeaking',x=>{if(!state||x.code!==code)return;state.voice={...(state.voice||{}),speakingPlayerIds:x.playerIds||[]};applyVoiceHighlight();});
-socket.on('firstTurnProgress',x=>{if(!state||x.code!==code||state.phase!=='first_turn_quiz')return;state.firstTurnQuiz.submittedPlayerIds=x.submittedPlayerIds||[];if(Number.isFinite(Number(x.remainingMs)))state.firstTurnQuiz.remainingMs=Number(x.remainingMs);if(x.timerStatus)state.firstTurnQuiz.timerStatus=x.timerStatus;render()});
-socket.on('audienceProgress',x=>{if(!state||x.code!==code||!state.audience)return;state.audience.joined=Number(x.joined||0);state.audience.submitted=Number(x.submitted||0);if(Number.isFinite(Number(x.remainingMs)))state.audience.remainingMs=Number(x.remainingMs);const joined=document.getElementById('audienceJoined');if(joined)joined.textContent=String(state.audience.joined);const submitted=document.getElementById('audienceSubmitted');if(submitted)submitted.textContent=`${state.audience.submitted}/${state.audience.joined}`;});
-
-function answerMediaHTML(cur){
- if(!cur||!['result','video_result'].includes(state?.phase))return '';
- const image=cur.answerImage?`<img src="${GameUI.esc(cur.answerImage)}" alt="Ілюстрація правильної відповіді" style="display:block;max-width:100%;max-height:40vh;object-fit:contain;margin:12px auto;border-radius:12px">`:'';
- return image;
-}
-function mediaQuestionHTML(cur,host=false){
- if(!cur||!['audio','audioReveal','video'].includes(cur.questionType))return '';
- const url=String(cur.media||'');
- if(!(url.startsWith('/media/')||/^https:\/\//i.test(url)))return '';
- const src=GameUI.esc(url),video=cur.questionType==='video',progress=cur.questionType==='audioReveal';
- const lastAudio=progress&&cur.revealStage>=cur.revealValues.length-1;
- const seconds=progress&&!lastAudio?Number(cur.revealSeconds?.[cur.revealStage]||2):0;
- const media=video?`<video class="quizMedia quizVideo" src="${src}" data-pause-at="${Number(cur.pauseAt||0)}" playsinline preload="metadata" style="width:100%;max-height:50vh"></video>`:`<audio class="quizMedia quizAudio" src="${src}" controls preload="metadata" style="width:100%"></audio>`;
- return `<div class="panel media-question" style="margin:12px auto;max-width:820px">${media}${progress?`<div class="muted">${lastAudio?'Повне аудіо':`Фрагмент до ${seconds} с`} · ${cur.value} балів</div>`:''}${host&&progress&&cur.revealStage<cur.revealValues.length-1?'<button class="btn gold" id="revealAudioStep">▶ Наступний фрагмент</button>':''}</div>`;
-}
-function captureMediaPlayback(){
- const el=document.querySelector('video.quizVideo,audio.quizAudio');
- if(!el||!state?.current)return null;
- return {node:el,src:el.getAttribute('src'),kind:el.tagName,stage:Number(state.current.revealStage||0),time:Number(el.currentTime||0),playing:!el.paused};
-}
-function stopDetachedMedia(snapshot){
- const el=document.querySelector('video.quizVideo,audio.quizAudio');
- if(!el)return;
- if(snapshot?.node===el){el.remove();return;}
- el.pause();el.removeAttribute('src');el.load();
-}
-function restoreMediaPlayback(snapshot){
- const fresh=document.querySelector('video.quizVideo,audio.quizAudio');
- if(!fresh||!snapshot?.node||!state?.current)return;
- const sameKind=fresh.tagName===snapshot.kind;
- const sameSrc=fresh.getAttribute('src')===snapshot.src;
- const sameStage=fresh.tagName==='VIDEO'||snapshot.stage===Number(state.current.revealStage||0);
- if(sameKind&&sameSrc&&sameStage){
-  fresh.replaceWith(snapshot.node);
-  const el=snapshot.node;
-  if(Number.isFinite(snapshot.time)&&Math.abs(el.currentTime-snapshot.time)>.15){try{el.currentTime=snapshot.time}catch(e){}}
-  if(snapshot.playing){const p=el.play();if(p&&p.catch)p.catch(()=>{})}else el.pause();
-  return;
- }
- try{snapshot.node.pause();snapshot.node.removeAttribute('src');snapshot.node.load()}catch(e){}
-}
-let pendingVideoControl=null,pendingAudioControl=null;
-function applyObsVideoControl(command){
- const cur=state?.current;
- if(cur?.questionType!=='video'||command?.code!==code||command.media!==cur.media)return;
- const el=document.querySelector('video.quizVideo');
- if(!el){pendingVideoControl=command;return;}
- const apply=()=>{
-  if(!el.isConnected)return;
-  const t=Math.max(0,Number(command.time)||0);
-  if(command.action==='seek'||Math.abs(el.currentTime-t)>.5){try{el.currentTime=t}catch(e){}}
-  if(command.action==='play'){el.muted=false;el.volume=1;el.play().catch(e=>console.warn('OBS video playback:',e))}
-  else if(command.action==='pause')el.pause();
- };
- if(el.readyState>=1)apply();else el.addEventListener('loadedmetadata',apply,{once:true});
-}
-function applyObsAudioControl(command){
- const cur=state?.current;
- if(!['audio','audioReveal'].includes(cur?.questionType)||command?.code!==code||command.media!==cur.media||Number(command.stage||0)!==Number(cur.revealStage||0))return;
- const el=document.querySelector('audio.quizAudio');
- if(!el){pendingAudioControl=command;return;}
- const apply=()=>{
-  if(!el.isConnected)return;
-  const t=Math.max(0,Number(command.time)||0);
-  if(command.action==='seek'||Math.abs(el.currentTime-t)>.35){try{el.currentTime=t}catch(e){}}
-  if(command.action==='play'){el.muted=false;el.volume=1;el.play().catch(e=>console.warn('OBS audio playback:',e))}
-  else if(command.action==='pause')el.pause();
- };
- if(el.readyState>=1)apply();else el.addEventListener('loadedmetadata',apply,{once:true});
-}
-socket.on('videoControl',applyObsVideoControl);
-socket.on('audioControl',applyObsAudioControl);
-function flushPendingObsMedia(){
- if(pendingVideoControl){const x=pendingVideoControl;pendingVideoControl=null;applyObsVideoControl(x)}
- if(pendingAudioControl){const x=pendingAudioControl;pendingAudioControl=null;applyObsAudioControl(x)}
-}
-function syncObsMediaFromState(){
- const cur=state?.current;
- if(cur?.questionType==='video'){
-  const el=document.querySelector('video.quizVideo');if(!el)return;
-  const key=[state.round,cur.ci,cur.qi,cur.media].join(':');
-  if(el.dataset.obsSyncKey===key)return;
-  el.dataset.obsSyncKey=key;
-  const sync=()=>{
-   const base=Math.max(0,Number(cur.videoTime||0));
-   const target=cur.videoPlaying&&Number(cur.videoUpdatedAt||0)?base+Math.max(0,(Date.now()-Number(cur.videoUpdatedAt))/1000):base;
-   if(Math.abs(el.currentTime-target)>.5){try{el.currentTime=target}catch(e){}}
-   if(cur.videoPlaying){el.muted=false;el.volume=1;el.play().catch(()=>{})}else el.pause();
-  };
-  if(el.readyState>=1)sync();else el.addEventListener('loadedmetadata',sync,{once:true});
- }else if(['audio','audioReveal'].includes(cur?.questionType)){
-  const el=document.querySelector('audio.quizAudio');if(!el)return;
-  const key=[state.round,cur.ci,cur.qi,cur.media,Number(cur.revealStage||0)].join(':');
-  if(el.dataset.obsSyncKey===key)return;
-  el.dataset.obsSyncKey=key;
-  const sync=()=>{
-   const base=Math.max(0,Number(cur.audioTime||0));
-   const target=cur.audioPlaying&&Number(cur.audioUpdatedAt||0)?base+Math.max(0,(Date.now()-Number(cur.audioUpdatedAt))/1000):base;
-   if(Math.abs(el.currentTime-target)>.35){try{el.currentTime=target}catch(e){}}
-   if(cur.audioPlaying){el.muted=false;el.volume=1;el.play().catch(()=>{})}else el.pause();
-  };
-  if(el.readyState>=1)sync();else el.addEventListener('loadedmetadata',sync,{once:true});
- }
-}
-function resumeVideoResult(){}
-function limitMediaPreview(){
- const cur=state?.current;
- if(cur?.questionType==='video'&&cur.pauseAt){
-  document.querySelectorAll('video.quizMedia').forEach(el=>{
-   if(el.dataset.stopGuardBound==='1')return;
-   el.dataset.stopGuardBound='1';
-   const stop=()=>{
-    const live=state?.current;
-    if(!live||live.questionType!=='video'||live.media!==el.getAttribute('src'))return;
-    if(live.videoContinued||['result','video_result'].includes(state?.phase))return;
-    const stopAt=Number(live.pauseAt||0);
-    if(stopAt>0&&el.currentTime>=stopAt){
-     el.pause();
-     if(Math.abs(el.currentTime-stopAt)>.05)el.currentTime=stopAt;
-    }
-   };
-   el.addEventListener('timeupdate',stop);
-   el.addEventListener('seeking',stop);
-  });
- }
- if(cur?.questionType!=='audioReveal')return;
- if(['result','video_result'].includes(state?.phase))return;
- if(cur.revealStage>=cur.revealValues.length-1)return; // Final stage: play the entire recording.
- const seconds=Number(cur.revealSeconds?.[cur.revealStage]||2);
- const el=document.querySelector('audio.quizAudio');
- if(!el)return;
- const stage=Number(cur.revealStage||0);
- if(el.dataset.revealGuardStage===String(stage))return;
- el.dataset.revealGuardStage=String(stage);
- const guard=()=>{
-  const live=state?.current;
-  if(live?.questionType!=='audioReveal'||Number(live.revealStage||0)!==stage||['result','video_result'].includes(state?.phase))return;
-  if(el.currentTime>=seconds){el.pause();if(Math.abs(el.currentTime-seconds)>.05){try{el.currentTime=seconds}catch(e){}}}
- };
- el.addEventListener('timeupdate',guard);
- el.addEventListener('seeking',guard);
-}
-function emojiQuestionHTML(cur){return cur?.questionType==='emoji'&&cur.emoji?`<div class="emojiQuestion">${GameUI.esc(cur.emoji)}</div>`:'';}
-function imageRevealHTML(cur,host=false){
- if(!cur||cur.questionType!=='imageReveal')return '';
- const stage=Number(cur.revealStage||0), last=(cur.revealValues?.length||5)-1;
- const single=last===0; const blur=single?0:([28,20,13,7,0][Math.min(stage,4)] ?? 0);
- const scale=single?1:([1.12,1.09,1.06,1.03,1][Math.min(stage,4)] ?? 1);
- return `<div class="imageRevealWrap">
+      function answerMediaHTML(cur) {
+        if (!cur || !["result", "video_result"].includes(state?.phase)) return "";
+        const image = cur.answerImage
+          ? `<img src="${GameUI.esc(cur.answerImage)}" alt="Ілюстрація правильної відповіді" style="display:block;max-width:100%;max-height:40vh;object-fit:contain;margin:12px auto;border-radius:12px">`
+          : "";
+        return image;
+      }
+      function mediaQuestionHTML(cur, host = false) {
+        if (!cur || !["audio", "audioReveal", "video"].includes(cur.questionType)) return "";
+        const url = String(cur.media || "");
+        if (!(url.startsWith("/media/") || /^https:\/\//i.test(url))) return "";
+        const src = GameUI.esc(url),
+          video = cur.questionType === "video",
+          progress = cur.questionType === "audioReveal";
+        const lastAudio = progress && cur.revealStage >= cur.revealValues.length - 1;
+        const seconds = progress && !lastAudio ? Number(cur.revealSeconds?.[cur.revealStage] || 2) : 0;
+        const media = video
+          ? `<video class="quizMedia quizVideo" src="${src}" data-pause-at="${Number(cur.pauseAt || 0)}" playsinline preload="metadata" style="width:100%;max-height:50vh"></video>`
+          : `<audio class="quizMedia quizAudio" src="${src}" controls preload="metadata" style="width:100%"></audio>`;
+        return `<div class="panel media-question" style="margin:12px auto;max-width:820px">${media}${progress ? `<div class="muted">${lastAudio ? "Повне аудіо" : `Фрагмент до ${seconds} с`} · ${cur.value} балів</div>` : ""}${host && progress && cur.revealStage < cur.revealValues.length - 1 ? '<button class="btn gold" id="revealAudioStep">▶ Наступний фрагмент</button>' : ""}</div>`;
+      }
+      function captureMediaPlayback() {
+        const el = document.querySelector("video.quizVideo,audio.quizAudio");
+        if (!el || !state?.current) return null;
+        return {
+          node: el,
+          src: el.getAttribute("src"),
+          kind: el.tagName,
+          stage: Number(state.current.revealStage || 0),
+          time: Number(el.currentTime || 0),
+          playing: !el.paused,
+        };
+      }
+      function stopDetachedMedia(snapshot) {
+        const el = document.querySelector("video.quizVideo,audio.quizAudio");
+        if (!el) return;
+        if (snapshot?.node === el) {
+          el.remove();
+          return;
+        }
+        el.pause();
+        el.removeAttribute("src");
+        el.load();
+      }
+      function restoreMediaPlayback(snapshot) {
+        const fresh = document.querySelector("video.quizVideo,audio.quizAudio");
+        if (!fresh || !snapshot?.node || !state?.current) return;
+        const sameKind = fresh.tagName === snapshot.kind;
+        const sameSrc = fresh.getAttribute("src") === snapshot.src;
+        const sameStage = fresh.tagName === "VIDEO" || snapshot.stage === Number(state.current.revealStage || 0);
+        if (sameKind && sameSrc && sameStage) {
+          fresh.replaceWith(snapshot.node);
+          const el = snapshot.node;
+          if (Number.isFinite(snapshot.time) && Math.abs(el.currentTime - snapshot.time) > 0.15) {
+            try {
+              el.currentTime = snapshot.time;
+            } catch (e) {}
+          }
+          if (snapshot.playing) {
+            const p = el.play();
+            if (p && p.catch) p.catch(() => {});
+          } else el.pause();
+          return;
+        }
+        try {
+          snapshot.node.pause();
+          snapshot.node.removeAttribute("src");
+          snapshot.node.load();
+        } catch (e) {}
+      }
+      let pendingVideoControl = null,
+        pendingAudioControl = null;
+      function applyObsVideoControl(command) {
+        const cur = state?.current;
+        if (cur?.questionType !== "video" || command?.code !== code || command.media !== cur.media) return;
+        const el = document.querySelector("video.quizVideo");
+        if (!el) {
+          pendingVideoControl = command;
+          return;
+        }
+        const apply = () => {
+          if (!el.isConnected) return;
+          const t = Math.max(0, Number(command.time) || 0);
+          if (command.action === "seek" || Math.abs(el.currentTime - t) > 0.5) {
+            try {
+              el.currentTime = t;
+            } catch (e) {}
+          }
+          if (command.action === "play") {
+            el.muted = false;
+            el.volume = 1;
+            el.play().catch(e => console.warn("OBS video playback:", e));
+          } else if (command.action === "pause") el.pause();
+        };
+        if (el.readyState >= 1) apply();
+        else el.addEventListener("loadedmetadata", apply, { once: true });
+      }
+      function applyObsAudioControl(command) {
+        const cur = state?.current;
+        if (
+          !["audio", "audioReveal"].includes(cur?.questionType)
+          || command?.code !== code
+          || command.media !== cur.media
+          || Number(command.stage || 0) !== Number(cur.revealStage || 0)
+        )
+          return;
+        const el = document.querySelector("audio.quizAudio");
+        if (!el) {
+          pendingAudioControl = command;
+          return;
+        }
+        const apply = () => {
+          if (!el.isConnected) return;
+          const t = Math.max(0, Number(command.time) || 0);
+          if (command.action === "seek" || Math.abs(el.currentTime - t) > 0.35) {
+            try {
+              el.currentTime = t;
+            } catch (e) {}
+          }
+          if (command.action === "play") {
+            el.muted = false;
+            el.volume = 1;
+            el.play().catch(e => console.warn("OBS audio playback:", e));
+          } else if (command.action === "pause") el.pause();
+        };
+        if (el.readyState >= 1) apply();
+        else el.addEventListener("loadedmetadata", apply, { once: true });
+      }
+      socket.on("videoControl", applyObsVideoControl);
+      socket.on("audioControl", applyObsAudioControl);
+      function flushPendingObsMedia() {
+        if (pendingVideoControl) {
+          const x = pendingVideoControl;
+          pendingVideoControl = null;
+          applyObsVideoControl(x);
+        }
+        if (pendingAudioControl) {
+          const x = pendingAudioControl;
+          pendingAudioControl = null;
+          applyObsAudioControl(x);
+        }
+      }
+      function syncObsMediaFromState() {
+        const cur = state?.current;
+        if (cur?.questionType === "video") {
+          const el = document.querySelector("video.quizVideo");
+          if (!el) return;
+          const key = [state.round, cur.ci, cur.qi, cur.media].join(":");
+          if (el.dataset.obsSyncKey === key) return;
+          el.dataset.obsSyncKey = key;
+          const sync = () => {
+            const base = Math.max(0, Number(cur.videoTime || 0));
+            const target =
+              cur.videoPlaying && Number(cur.videoUpdatedAt || 0)
+                ? base + Math.max(0, (Date.now() - Number(cur.videoUpdatedAt)) / 1000)
+                : base;
+            if (Math.abs(el.currentTime - target) > 0.5) {
+              try {
+                el.currentTime = target;
+              } catch (e) {}
+            }
+            if (cur.videoPlaying) {
+              el.muted = false;
+              el.volume = 1;
+              el.play().catch(() => {});
+            } else el.pause();
+          };
+          if (el.readyState >= 1) sync();
+          else el.addEventListener("loadedmetadata", sync, { once: true });
+        } else if (["audio", "audioReveal"].includes(cur?.questionType)) {
+          const el = document.querySelector("audio.quizAudio");
+          if (!el) return;
+          const key = [state.round, cur.ci, cur.qi, cur.media, Number(cur.revealStage || 0)].join(":");
+          if (el.dataset.obsSyncKey === key) return;
+          el.dataset.obsSyncKey = key;
+          const sync = () => {
+            const base = Math.max(0, Number(cur.audioTime || 0));
+            const target =
+              cur.audioPlaying && Number(cur.audioUpdatedAt || 0)
+                ? base + Math.max(0, (Date.now() - Number(cur.audioUpdatedAt)) / 1000)
+                : base;
+            if (Math.abs(el.currentTime - target) > 0.35) {
+              try {
+                el.currentTime = target;
+              } catch (e) {}
+            }
+            if (cur.audioPlaying) {
+              el.muted = false;
+              el.volume = 1;
+              el.play().catch(() => {});
+            } else el.pause();
+          };
+          if (el.readyState >= 1) sync();
+          else el.addEventListener("loadedmetadata", sync, { once: true });
+        }
+      }
+      function resumeVideoResult() {}
+      function limitMediaPreview() {
+        const cur = state?.current;
+        if (cur?.questionType === "video" && cur.pauseAt) {
+          document.querySelectorAll("video.quizMedia").forEach(el => {
+            if (el.dataset.stopGuardBound === "1") return;
+            el.dataset.stopGuardBound = "1";
+            const stop = () => {
+              const live = state?.current;
+              if (!live || live.questionType !== "video" || live.media !== el.getAttribute("src")) return;
+              if (live.videoContinued || ["result", "video_result"].includes(state?.phase)) return;
+              const stopAt = Number(live.pauseAt || 0);
+              if (stopAt > 0 && el.currentTime >= stopAt) {
+                el.pause();
+                if (Math.abs(el.currentTime - stopAt) > 0.05) el.currentTime = stopAt;
+              }
+            };
+            el.addEventListener("timeupdate", stop);
+            el.addEventListener("seeking", stop);
+          });
+        }
+        if (cur?.questionType !== "audioReveal") return;
+        if (["result", "video_result"].includes(state?.phase)) return;
+        if (cur.revealStage >= cur.revealValues.length - 1) return; // Final stage: play the entire recording.
+        const seconds = Number(cur.revealSeconds?.[cur.revealStage] || 2);
+        const el = document.querySelector("audio.quizAudio");
+        if (!el) return;
+        const stage = Number(cur.revealStage || 0);
+        if (el.dataset.revealGuardStage === String(stage)) return;
+        el.dataset.revealGuardStage = String(stage);
+        const guard = () => {
+          const live = state?.current;
+          if (
+            live?.questionType !== "audioReveal"
+            || Number(live.revealStage || 0) !== stage
+            || ["result", "video_result"].includes(state?.phase)
+          )
+            return;
+          if (el.currentTime >= seconds) {
+            el.pause();
+            if (Math.abs(el.currentTime - seconds) > 0.05) {
+              try {
+                el.currentTime = seconds;
+              } catch (e) {}
+            }
+          }
+        };
+        el.addEventListener("timeupdate", guard);
+        el.addEventListener("seeking", guard);
+      }
+      function emojiQuestionHTML(cur) {
+        return cur?.questionType === "emoji" && cur.emoji
+          ? `<div class="emojiQuestion">${GameUI.esc(cur.emoji)}</div>`
+          : "";
+      }
+      function imageRevealHTML(cur, host = false) {
+        if (!cur || cur.questionType !== "imageReveal") return "";
+        const stage = Number(cur.revealStage || 0),
+          last = (cur.revealValues?.length || 5) - 1;
+        const single = last === 0;
+        const blur = single ? 0 : ([28, 20, 13, 7, 0][Math.min(stage, 4)] ?? 0);
+        const scale = single ? 1 : ([1.12, 1.09, 1.06, 1.03, 1][Math.min(stage, 4)] ?? 1);
+        return `<div class="imageRevealWrap">
    <div class="imageRevealValue">${cur.value} БАЛІВ</div>
-   <div class="imageRevealFrame"><img src="${GameUI.esc(cur.image||'')}" class="imageRevealImg" style="filter:blur(${blur}px);transform:scale(${scale})"></div>
-   ${single?'':`<div class="muted center">Відкриття ${stage+1}/${last+1}</div>`}
-   ${host&&stage<last?'<div class="row" style="justify-content:center;margin-top:12px"><button class="btn gold" id="revealImageStep">👁 ВІДКРИТИ ЩЕ → '+GameUI.esc(String(cur.revealValues[stage+1]))+' БАЛІВ</button></div>':''}
+   <div class="imageRevealFrame"><img src="${GameUI.esc(cur.image || "")}" class="imageRevealImg" style="filter:blur(${blur}px);transform:scale(${scale})"></div>
+   ${single ? "" : `<div class="muted center">Відкриття ${stage + 1}/${last + 1}</div>`}
+   ${host && stage < last ? '<div class="row" style="justify-content:center;margin-top:12px"><button class="btn gold" id="revealImageStep">👁 ВІДКРИТИ ЩЕ → ' + GameUI.esc(String(cur.revealValues[stage + 1])) + " БАЛІВ</button></div>" : ""}
  </div>`;
-}
-let audienceClockHandle=null;
-function armAudienceClock(){if(audienceClockHandle){clearInterval(audienceClockHandle);audienceClockHandle=null}const el=document.getElementById('audienceTimer');if(!el)return;const remaining=Math.max(0,Number(state?.audience?.remainingMs||0));const end=Date.now()+remaining;const tick=()=>{const left=Math.max(0,(end-Date.now())/1000);el.textContent=left.toFixed(1);if(left<=0){clearInterval(audienceClockHandle);audienceClockHandle=null}};tick();audienceClockHandle=setInterval(tick,100)}
-let numericClockHandle=null;
-function armNumericClock(){if(numericClockHandle){clearInterval(numericClockHandle);numericClockHandle=null}const el=document.getElementById('numericTimer'),remaining=Number(state?.numericChallenge?.remainingMs||0);if(!el||remaining<=0)return;const end=Date.now()+remaining;const tick=()=>{const left=Math.max(0,Math.ceil((end-Date.now())/1000));el.textContent=left;if(left<=0){clearInterval(numericClockHandle);numericClockHandle=null}};tick();numericClockHandle=setInterval(tick,200)}
-function fitQuestionToOBS(){
- if(!['question','buzz','answering','cat_question','result','video_result','va_bank_question','duel_question','triplet_question','triplet_result'].includes(state?.phase))return;
- const panel=app.querySelector('.panel'),question=panel?.querySelector('.question'),scores=app.querySelector('.scorebar');
- if(!panel||!question)return;
- const available=Math.max(280,window.innerHeight-(scores?.offsetHeight||70)-34);
- let size=parseFloat(getComputedStyle(question).fontSize);
- for(let i=0;i<14&&panel.getBoundingClientRect().height>available&&size>17;i++){
-  size=Math.max(17,size-1.5);question.style.fontSize=size+'px';
- }
- if(panel.getBoundingClientRect().height>available){
-  const image=panel.querySelector('img[alt="Ілюстрація правильної відповіді"],.imageRevealImg');
-  if(image)image.style.maxHeight=Math.max(90,available-panel.getBoundingClientRect().height+image.getBoundingClientRect().height-12)+'px';
- }
-}
+      }
+      let audienceClockHandle = null;
+      function armAudienceClock() {
+        if (audienceClockHandle) {
+          clearInterval(audienceClockHandle);
+          audienceClockHandle = null;
+        }
+        const el = document.getElementById("audienceTimer");
+        if (!el) return;
+        const remaining = Math.max(0, Number(state?.audience?.remainingMs || 0));
+        const end = Date.now() + remaining;
+        const tick = () => {
+          const left = Math.max(0, (end - Date.now()) / 1000);
+          el.textContent = left.toFixed(1);
+          if (left <= 0) {
+            clearInterval(audienceClockHandle);
+            audienceClockHandle = null;
+          }
+        };
+        tick();
+        audienceClockHandle = setInterval(tick, 100);
+      }
+      let numericClockHandle = null;
+      function armNumericClock() {
+        if (numericClockHandle) {
+          clearInterval(numericClockHandle);
+          numericClockHandle = null;
+        }
+        const el = document.getElementById("numericTimer"),
+          remaining = Number(state?.numericChallenge?.remainingMs || 0);
+        if (!el || remaining <= 0) return;
+        const end = Date.now() + remaining;
+        const tick = () => {
+          const left = Math.max(0, Math.ceil((end - Date.now()) / 1000));
+          el.textContent = left;
+          if (left <= 0) {
+            clearInterval(numericClockHandle);
+            numericClockHandle = null;
+          }
+        };
+        tick();
+        numericClockHandle = setInterval(tick, 200);
+      }
+      function fitQuestionToOBS() {
+        if (
+          ![
+            "question",
+            "buzz",
+            "answering",
+            "cat_question",
+            "result",
+            "video_result",
+            "va_bank_question",
+            "duel_question",
+            "triplet_question",
+            "triplet_result",
+          ].includes(state?.phase)
+        )
+          return;
+        const panel = app.querySelector(".panel"),
+          question = panel?.querySelector(".question"),
+          scores = app.querySelector(".scorebar");
+        if (!panel || !question) return;
+        const available = Math.max(280, window.innerHeight - (scores?.offsetHeight || 70) - 34);
+        let size = parseFloat(getComputedStyle(question).fontSize);
+        for (let i = 0; i < 14 && panel.getBoundingClientRect().height > available && size > 17; i++) {
+          size = Math.max(17, size - 1.5);
+          question.style.fontSize = size + "px";
+        }
+        if (panel.getBoundingClientRect().height > available) {
+          const image = panel.querySelector('img[alt="Ілюстрація правильної відповіді"],.imageRevealImg');
+          if (image)
+            image.style.maxHeight =
+              Math.max(90, available - panel.getBoundingClientRect().height + image.getBoundingClientRect().height - 12)
+              + "px";
+        }
+      }
 
-/* UI-03: VS panel uses actual duelPlayers ids, not player list order. */
-let lastDuelPairKey = null;
-function duelMatchupHTML(){
- const ids=Array.isArray(state?.duelPlayers)?state.duelPlayers:[];
- const p1=state.players.find(p=>p.id===(ids[0]||state.turnPlayerId));
- const p2=ids[1]?state.players.find(p=>p.id===ids[1]):null;
- const pairKey=ids.length===2?ids.join(':'):null;
- const animateOpponent=!!pairKey&&pairKey!==lastDuelPairKey;
- lastDuelPairKey=pairKey;
- const answerer=GameUI.answererId(state),value=Number(state.current?.value||0);
- const fighter=(p,role,second=false)=>{
-   const active=!!p&&p.id===answerer;
-   const classes=['duelFighter',!p?'is-waiting':'',active?'is-answering':'',second&&animateOpponent?'duelEntrance':''].filter(Boolean).join(' ');
-   const id=p?' data-player-id="'+GameUI.esc(p.id)+'"':'';
-   return '<div class="'+classes+'"'+id+'><div class="duelFighter-role">'+GameUI.esc(role)+'</div><div class="duelFighter-name">'+(p?GameUI.esc(p.name):'?')+'</div><div class="duelFighter-score">'+(p?GameUI.esc(p.score):'—')+'</div></div>';
- };
- return '<div class="duelStage"><div class="duelHeading">⚔️ ДУЕЛЬ'+(value?' • '+value+' БАЛІВ':'')+'</div><div class="duelMatchup">'+fighter(p1,'ВИКЛИК')+'<div class="duelVersus">VS</div>'+fighter(p2,p2?'СУПЕРНИК':'ОБИРАЄМО СУПЕРНИКА',true)+'</div></div>';
-}
+      /* UI-03: VS panel uses actual duelPlayers ids, not player list order. */
+      let lastDuelPairKey = null;
+      function duelMatchupHTML() {
+        const ids = Array.isArray(state?.duelPlayers) ? state.duelPlayers : [];
+        const p1 = state.players.find(p => p.id === (ids[0] || state.turnPlayerId));
+        const p2 = ids[1] ? state.players.find(p => p.id === ids[1]) : null;
+        const pairKey = ids.length === 2 ? ids.join(":") : null;
+        const animateOpponent = !!pairKey && pairKey !== lastDuelPairKey;
+        lastDuelPairKey = pairKey;
+        const answerer = GameUI.answererId(state),
+          value = Number(state.current?.value || 0);
+        const fighter = (p, role, second = false) => {
+          const active = !!p && p.id === answerer;
+          const classes = [
+            "duelFighter",
+            !p ? "is-waiting" : "",
+            active ? "is-answering" : "",
+            second && animateOpponent ? "duelEntrance" : "",
+          ]
+            .filter(Boolean)
+            .join(" ");
+          const id = p ? ' data-player-id="' + GameUI.esc(p.id) + '"' : "";
+          return (
+            '<div class="'
+            + classes
+            + '"'
+            + id
+            + '><div class="duelFighter-role">'
+            + GameUI.esc(role)
+            + '</div><div class="duelFighter-name">'
+            + (p ? GameUI.esc(p.name) : "?")
+            + '</div><div class="duelFighter-score">'
+            + (p ? GameUI.esc(p.score) : "—")
+            + "</div></div>"
+          );
+        };
+        return (
+          '<div class="duelStage"><div class="duelHeading">⚔️ ДУЕЛЬ'
+          + (value ? " • " + value + " БАЛІВ" : "")
+          + '</div><div class="duelMatchup">'
+          + fighter(p1, "ВИКЛИК")
+          + '<div class="duelVersus">VS</div>'
+          + fighter(p2, p2 ? "СУПЕРНИК" : "ОБИРАЄМО СУПЕРНИКА", true)
+          + "</div></div>"
+        );
+      }
 
-/* UI-05: present the actual VA-BANK answerer, including wager and result. */
-function vaBankHeaderHTML(){
- const player=state?.players?.find(p=>p.id===state.vaBankPlayer);
- const betValue=state?.vaBankBet;
- const hasBet=betValue!==null&&betValue!==undefined&&Number.isFinite(Number(betValue));
- const name=player?GameUI.esc(player.name):'—';
- const wager=hasBet?'СТАВКА: '+GameUI.esc(String(betValue))+' БАЛІВ':'ГОТУЄ СТАВКУ';
- return '<div class="vaBankStage"><div class="vaBankHeading">🎰 ВА-БАНК</div><div class="vaBankInfo"><div class="vaBankAnswerer">ВІДПОВІДАЄ: <b>'+name+'</b></div><div class="vaBankStake">'+wager+'</div></div></div>';
-}
+      /* UI-05: present the actual VA-BANK answerer, including wager and result. */
+      function vaBankHeaderHTML() {
+        const player = state?.players?.find(p => p.id === state.vaBankPlayer);
+        const betValue = state?.vaBankBet;
+        const hasBet = betValue !== null && betValue !== undefined && Number.isFinite(Number(betValue));
+        const name = player ? GameUI.esc(player.name) : "—";
+        const wager = hasBet ? "СТАВКА: " + GameUI.esc(String(betValue)) + " БАЛІВ" : "ГОТУЄ СТАВКУ";
+        return (
+          '<div class="vaBankStage"><div class="vaBankHeading">🎰 ВА-БАНК</div><div class="vaBankInfo"><div class="vaBankAnswerer">ВІДПОВІДАЄ: <b>'
+          + name
+          + '</b></div><div class="vaBankStake">'
+          + wager
+          + "</div></div></div>"
+        );
+      }
 
-/* UI-06: only judged question values/results are sent by server; no answers or assumptions. */
-function tripletProgressHTML(t,name){
- const total=Math.max(1,Math.floor(Number(t?.total)||3));
- const index=Math.max(0,Math.min(total-1,Math.floor(Number(t?.index)||0)));
- const steps=Array.isArray(t?.steps)?t.steps:[];
- const results=Array.isArray(t?.results)?t.results:[];
- const finished=results.length>=total;
- const net=results.reduce((sum,r)=>sum+(r.correct?1:-1)*(Number(r.value)||0),0);
- const tiles=Array.from({length:total},(_,i)=>{
-   const r=results[i],checked=!!r&&typeof r.correct==='boolean';
-   const current=!checked&&i===index;
-   const number=Number(steps[i]??(i===index?state?.current?.value:0));
-   const value=Number.isFinite(number)?number:0;
-   const points=checked?(Number(r.value)||0):value;
-   const classes=['tripletStep',checked?(r.correct?'is-correct':'is-wrong'):current?'is-current':'',current&&i===total-1?'is-final':''].filter(Boolean).join(' ');
-   const icon=checked?(r.correct?'✅':'❌'):current?'🔥':'○';
-   const status=checked?(r.correct?'+':'−')+String(Math.abs(points)):current?'ЗАРАЗ':'ПОПЕРЕДУ';
-   return '<div class="'+classes+'"><div class="tripletStep-label">ПИТАННЯ '+(i+1)+'</div><div class="tripletStep-value">'+GameUI.esc(String(value))+'</div><div class="tripletStep-status">'+icon+' '+GameUI.esc(status)+'</div></div>';
- }).join('');
- const netLabel=(net>=0?'+':'−')+String(Math.abs(net));
- const netHTML=finished?'<div class="tripletNet'+(net<0?' negative':'')+'">СЕРІЮ ЗАВЕРШЕНО • '+netLabel+' БАЛІВ</div>':'';
- return '<div class="tripletStage"><div class="tripletTitle">🔥 ТРИПЛЕТ • '+total+' ВИКЛИКИ</div>'+
-   '<div class="tripletSubtitle">ЕТАП '+(index+1)+' З '+total+'</div>'+
-   '<div class="tripletSteps" style="--triplet-count:'+total+'">'+tiles+'</div>'+
-   '<div class="tripletPlayer"><span>ПРОХОДИТЬ ТРИПЛЕТ</span><b>'+GameUI.esc(name||'—')+'</b></div>'+
-   netHTML+'</div>';
-}
-function applyAnswererHighlight(){
- const vaBankCurrent=state?.current?.type==='va_bank'&&['va_bank_bet','va_bank_question','result'].includes(state.phase);
- const tripletCurrent=state?.current?.questionType==='triplet'&&['triplet_question','triplet_result'].includes(state.phase);
- const tripletPreviewPlayer=state.phase==='board'&&!state.selectedTile&&tripletFinishPreview?.until>Date.now()?tripletFinishPreview.answererId:null;
- const answerer=tripletPreviewPlayer||(tripletCurrent?state.current.triplet?.answererId:(vaBankCurrent?state.vaBankPlayer:GameUI.answererId(state)));
- app.querySelectorAll('.scorebar .player').forEach((card,i)=>card.classList.toggle('active',!!answerer&&state.players?.[i]?.id===answerer));
-}
-function applyVoiceHighlight(){const speaking=new Set(state?.voice?.speakingPlayerIds||[]);const cards=app.querySelectorAll('.scorebar .player');const players=state?.players||[];cards.forEach((card,i)=>card.classList.toggle('voice-speaking',speaking.has(players[i]?.id)));app.querySelectorAll('.duelFighter[data-player-id]').forEach(card=>card.classList.toggle('voice-speaking',speaking.has(card.dataset.playerId)));}
-function render(){if(!state||!data)return;let h=``;
- if(state.phase==='paused'){
-   app.innerHTML=`<div class="panel center" style="margin-top:8vh;padding:56px"><div class="huge">⏸</div><h1 style="font-size:54px">ТЕХНІЧНА ПАУЗА</h1><p class="muted" style="font-size:24px">Скоро продовжимо</p></div>`;
-   return;
- }
+      /* UI-06: only judged question values/results are sent by server; no answers or assumptions. */
+      function tripletProgressHTML(t, name) {
+        const total = Math.max(1, Math.floor(Number(t?.total) || 3));
+        const index = Math.max(0, Math.min(total - 1, Math.floor(Number(t?.index) || 0)));
+        const steps = Array.isArray(t?.steps) ? t.steps : [];
+        const results = Array.isArray(t?.results) ? t.results : [];
+        const finished = results.length >= total;
+        const net = results.reduce((sum, r) => sum + (r.correct ? 1 : -1) * (Number(r.value) || 0), 0);
+        const tiles = Array.from({ length: total }, (_, i) => {
+          const r = results[i],
+            checked = !!r && typeof r.correct === "boolean";
+          const current = !checked && i === index;
+          const number = Number(steps[i] ?? (i === index ? state?.current?.value : 0));
+          const value = Number.isFinite(number) ? number : 0;
+          const points = checked ? Number(r.value) || 0 : value;
+          const classes = [
+            "tripletStep",
+            checked ? (r.correct ? "is-correct" : "is-wrong") : current ? "is-current" : "",
+            current && i === total - 1 ? "is-final" : "",
+          ]
+            .filter(Boolean)
+            .join(" ");
+          const icon = checked ? (r.correct ? "✅" : "❌") : current ? "🔥" : "○";
+          const status = checked ? (r.correct ? "+" : "−") + String(Math.abs(points)) : current ? "ЗАРАЗ" : "ПОПЕРЕДУ";
+          return (
+            '<div class="'
+            + classes
+            + '"><div class="tripletStep-label">ПИТАННЯ '
+            + (i + 1)
+            + '</div><div class="tripletStep-value">'
+            + GameUI.esc(String(value))
+            + '</div><div class="tripletStep-status">'
+            + icon
+            + " "
+            + GameUI.esc(status)
+            + "</div></div>"
+          );
+        }).join("");
+        const netLabel = (net >= 0 ? "+" : "−") + String(Math.abs(net));
+        const netHTML = finished
+          ? '<div class="tripletNet' + (net < 0 ? " negative" : "") + '">СЕРІЮ ЗАВЕРШЕНО • ' + netLabel + " БАЛІВ</div>"
+          : "";
+        return (
+          '<div class="tripletStage"><div class="tripletTitle">🔥 ТРИПЛЕТ • '
+          + total
+          + " ВИКЛИКИ</div>"
+          + '<div class="tripletSubtitle">ЕТАП '
+          + (index + 1)
+          + " З "
+          + total
+          + "</div>"
+          + '<div class="tripletSteps" style="--triplet-count:'
+          + total
+          + '">'
+          + tiles
+          + "</div>"
+          + '<div class="tripletPlayer"><span>ПРОХОДИТЬ ТРИПЛЕТ</span><b>'
+          + GameUI.esc(name || "—")
+          + "</b></div>"
+          + netHTML
+          + "</div>"
+        );
+      }
+      function applyAnswererHighlight() {
+        const vaBankCurrent =
+          state?.current?.type === "va_bank" && ["va_bank_bet", "va_bank_question", "result"].includes(state.phase);
+        const tripletCurrent =
+          state?.current?.questionType === "triplet" && ["triplet_question", "triplet_result"].includes(state.phase);
+        const tripletPreviewPlayer =
+          state.phase === "board" && !state.selectedTile && tripletFinishPreview?.until > Date.now()
+            ? tripletFinishPreview.answererId
+            : null;
+        const answerer =
+          tripletPreviewPlayer
+          || (tripletCurrent
+            ? state.current.triplet?.answererId
+            : vaBankCurrent
+              ? state.vaBankPlayer
+              : GameUI.answererId(state));
+        app
+          .querySelectorAll(".scorebar .player")
+          .forEach((card, i) => card.classList.toggle("active", !!answerer && state.players?.[i]?.id === answerer));
+      }
+      function applyVoiceHighlight() {
+        const speaking = new Set(state?.voice?.speakingPlayerIds || []);
+        const cards = app.querySelectorAll(".scorebar .player");
+        const players = state?.players || [];
+        cards.forEach((card, i) => card.classList.toggle("voice-speaking", speaking.has(players[i]?.id)));
+        app
+          .querySelectorAll(".duelFighter[data-player-id]")
+          .forEach(card => card.classList.toggle("voice-speaking", speaking.has(card.dataset.playerId)));
+      }
+      function render() {
+        if (!state || !data) return;
+        let h = ``;
+        if (state.phase === "paused") {
+          app.innerHTML = `<div class="panel center" style="margin-top:8vh;padding:56px"><div class="huge">⏸</div><h1 style="font-size:54px">ТЕХНІЧНА ПАУЗА</h1><p class="muted" style="font-size:24px">Скоро продовжимо</p></div>`;
+          return;
+        }
 
- if(state.phase==='lobby')h+=`<div class="panel center"><div class="roomCode">${state.code}</div><h2>Приєднуйтесь з телефону</h2></div>${GameUI.playersHTML(state.players,null,state)}`;
- else if(state.phase==='first_turn_quiz'){
-   const q=state.firstTurnQuiz||{}, submitted=q.submittedPlayerIds||[], status=q.timerStatus||'ready';
-   const timer=status==='running'?`<div class="huge"><span id="firstTurnTimer">${Math.max(0,Math.ceil(Number(q.remainingMs||0)/1000))}</span></div>`:status==='expired'?'<div class="huge">0</div><h2>⏱ ЧАС ВИЙШОВ</h2>':'<div class="huge">30</div><p class="muted">Таймер ще не запущено</p>';
-   h+=`<div class="panel center"><div class="huge">🎯</div><h1>РОЗІГРАШ ПЕРШОГО ХОДУ</h1><div class="question" style="font-size:clamp(20px,2.2vw,34px);line-height:1.22;max-width:1040px;margin:16px auto">${GameUI.esc(q.question||'')}</div>${timer}<p class="muted">Хто буде найближчим до правильної відповіді?</p>
+        if (state.phase === "lobby")
+          h += `<div class="panel center"><div class="roomCode">${state.code}</div><h2>Приєднуйтесь з телефону</h2></div>${GameUI.playersHTML(state.players, null, state)}`;
+        else if (state.phase === "first_turn_quiz") {
+          const q = state.firstTurnQuiz || {},
+            submitted = q.submittedPlayerIds || [],
+            status = q.timerStatus || "ready";
+          const timer =
+            status === "running"
+              ? `<div class="huge"><span id="firstTurnTimer">${Math.max(0, Math.ceil(Number(q.remainingMs || 0) / 1000))}</span></div>`
+              : status === "expired"
+                ? '<div class="huge">0</div><h2>⏱ ЧАС ВИЙШОВ</h2>'
+                : '<div class="huge">30</div><p class="muted">Таймер ще не запущено</p>';
+          h += `<div class="panel center"><div class="huge">🎯</div><h1>РОЗІГРАШ ПЕРШОГО ХОДУ</h1><div class="question" style="font-size:clamp(20px,2.2vw,34px);line-height:1.22;max-width:1040px;margin:16px auto">${GameUI.esc(q.question || "")}</div>${timer}<p class="muted">Хто буде найближчим до правильної відповіді?</p>
    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px 12px;margin:14px auto 0;max-width:760px;text-align:left">
-   ${state.players.map(p=>{const done=submitted.includes(p.id);const label=done?'✅ Відповів':status==='expired'?'❌ Немає відповіді':'⏳ Думає';return `<div style="display:flex;justify-content:space-between;align-items:center;padding:9px 14px;border:1px solid #3a2b60;border-radius:12px;background:rgba(255,255,255,.025);font-size:17px"><b>${GameUI.esc(p.name)}</b><span>${label}</span></div>`}).join('')}
-   </div></div>`}
- else if(state.phase==='first_turn_result'){
-   const q=state.firstTurnQuiz, results=q.results||[], revealCount=q.revealCount||0;
-   const revealed=results.slice(Math.max(0,results.length-revealCount)).reverse();
-   h+=`<div class="panel center"><div class="huge">${q.correctAnswer}</div><h2>ПРАВИЛЬНА ВІДПОВІДЬ</h2><p class="muted">${GameUI.esc(q.unit||'')}</p>
-   <div class="finalList" style="margin-top:22px">${revealed.map(r=>{
-      const place=results.findIndex(x=>x.id===r.id)+1;
-      return `<div class="finalItem" style="padding:14px 20px;min-height:58px"><span class="winner" style="font-size:28px">${place===1?'🥇 ':''}${place}. ${GameUI.esc(r.name)}</span><span style="font-size:21px;line-height:1.25">${r.noAnswer?'<b>— НЕМАЄ ВІДПОВІДІ</b>':`Відповідь: <b style="font-size:25px">${r.answer}</b> &nbsp; • &nbsp; Різниця: <b style="font-size:25px">${r.diff}</b>`}</span></div>`;
-   }).join('')}</div>
-   ${revealCount===0?'<p class="muted" style="margin-top:24px">Готуємо результати…</p>':''}
-   </div>`}
- else if(state.phase==='numeric_ready'){const n=state.numericChallenge||{};h+=`<div class="panel center"><div class="huge">🔢 30</div><h1>ЧИСЛОВЕ ПИТАННЯ • ${n.value} БАЛІВ</h1><div class="question">${GameUI.esc(n.question||'')}</div><h2>⏳ ЧЕКАЄМО СТАРТУ ВЕДУЧОГО</h2></div>`}
- else if(state.phase==='numeric_question'){const n=state.numericChallenge||{},sub=n.submittedPlayerIds||[],left=Math.max(0,Math.ceil(Number(n.remainingMs||0)/1000));h+=`<div class="panel center"><div class="huge">🔢 <span id="numericTimer">${left}</span></div><h1>ЧИСЛОВЕ ПИТАННЯ • ${n.value} БАЛІВ</h1><div class="question">${GameUI.esc(n.question||'')}</div><div class="finalList">${state.players.map(p=>`<div class="finalItem"><span>${GameUI.esc(p.name)}</span><b>${sub.includes(p.id)?'✅ Відповів':'⏳ Думає'}</b></div>`).join('')}</div></div>`}
- else if(state.phase==='numeric_result'){const n=state.numericChallenge||{},rs=n.results||[],rev=n.revealCount||0,revealed=rs.slice(Math.max(0,rs.length-rev)).reverse();h+=`<div class="panel center"><div class="huge">${n.correctAnswer}</div><h2>ПРАВИЛЬНА ВІДПОВІДЬ</h2><div class="finalList">${revealed.map(r=>{const place=rs.findIndex(x=>x.id===r.id)+1;return `<div class="finalItem"><span class="winner">${place===1?'🥇 ':''}${place}. ${GameUI.esc(r.name)}</span><span>${r.noAnswer?'— НЕМАЄ ВІДПОВІДІ':`Відповідь: <b>${r.answer}</b> • різниця: <b>${r.diff}</b>${place===1?' • +'+n.value:''}`}</span></div>`}).join('')}</div></div>`}
- else if(state.phase==='board'&&tripletFinishPreview?.until>Date.now()&&!state.selectedTile){const snap=tripletFinishPreview;h+=`<div class="obsGameLayout"><div class="obsSegment obsSegmentQuestion panel">${tripletProgressHTML(snap.triplet,snap.name)}<div class="tripletSummaryText">🏁 ТРИПЛЕТ ЗАВЕРШЕНО!</div></div><div class="obsSegment obsSegmentMedia"></div><div class="obsSegment obsSegmentAnswer panel is-empty"></div><div class="obsSegment obsSegmentPlayers">${GameUI.playersHTML(state.players,snap.answererId,state)}</div></div>`;}
- else if(state.phase==='board'){let chooser=state.players.find(p=>p.id===state.turnPlayerId);h+=`<div class="center" style="margin:8px 0 22px;font-size:30px;line-height:1.2;font-weight:700">🎯 Питання обирає: <b style="font-size:36px">${GameUI.esc(chooser?.name||'—')}</b></div>${GameUI.boardHTML(data,state,false)}${GameUI.playersHTML(state.players,null,state)}`;}
- else if(state.phase==='audience_lobby'){const a=state.audience||{};h+=`<div class="panel center"><div style="font-size:26px;font-weight:900;letter-spacing:.15em">👥 ГРАЮТЬ ГЛЯДАЧІ</div><h1 style="font-size:52px">${GameUI.esc(a.title||'')}</h1><img class="audQr" src="/audience-qr/${state.code}"><h2>Скануй QR • введи нік • забирай приз</h2><p style="font-size:24px">У грі: <b id="audienceJoined">${a.joined||0}</b></p></div>`}
- else if(state.phase==='audience_question'){const a=state.audience||{},left=Math.max(0,Number(a.remainingMs||0)/1000);h+=`<div class="panel center"><div class="huge" id="audienceTimer">${left}.0</div><h2>ГЛЯДАЧІ • ПИТАННЯ ${a.questionIndex+1}/${a.totalQuestions}</h2><div class="question">${GameUI.esc(a.question||'')}</div><div class="audGrid">${(a.options||[]).map((o,i)=>`<div class="audOpt">${'ABCD'[i]} • ${GameUI.esc(o)}</div>`).join('')}</div><p style="font-size:22px">Відповіли: <b id="audienceSubmitted">${a.submitted||0}/${a.joined||0}</b></p></div>`}
- else if(state.phase==='audience_result'){const a=state.audience||{},total=Math.max(1,a.submitted||0);h+=`<div class="panel center"><h2>ПРАВИЛЬНА ВІДПОВІДЬ</h2><div class="huge">${'ABCD'[a.correct]} • ${GameUI.esc(a.options?.[a.correct]||'')}</div><div class="audGrid">${(a.options||[]).map((o,i)=>`<div class="audOpt" style="${i===a.correct?'border:2px solid rgba(100,255,160,.8)':''}">${'ABCD'[i]} • ${GameUI.esc(o)} — <b>${Math.round((a.counts?.[i]||0)*100/total)}%</b></div>`).join('')}</div><p style="font-size:22px">${GameUI.esc(a.fact||'')}</p></div>`}
- else if(state.phase==='audience_podium'){const a=state.audience||{},rs=(a.ranking||[]).slice(0,5),rev=a.revealCount||0,n=Math.min(5,rs.length),shown=rs.slice(Math.max(0,n-rev),n).reverse(),latest=shown[shown.length-1];h+=`<div class="panel center"><h1>🏆 ${GameUI.esc(a.title||'')}</h1>${latest?`<div style="font-size:34px;font-weight:900">${rs.indexOf(latest)+1===1?'🥇 ПЕРЕМОЖЕЦЬ':(rs.indexOf(latest)+1)+' МІСЦЕ'}</div><div class="winner" style="font-size:72px">${GameUI.esc(latest.name)}</div><div style="font-size:28px">${latest.correct}/3 правильних • ${(latest.timeMs/1000).toFixed(2)} с</div>`:'<div class="huge">ТОП-5</div>'}${shown.length>1?`<div class="finalList">${shown.slice(0,-1).map(r=>`<div class="finalItem"><span>${GameUI.esc(r.name)}</span><b>${r.correct}/3 • ${(r.timeMs/1000).toFixed(2)} с</b></div>`).join('')}</div>`:''}</div>`}
- else if(['triplet_question','triplet_result'].includes(state.phase)){const t=state.current?.triplet||{},p=state.players.find(x=>x.id===t.answererId),show=state.phase==='triplet_result'&&state.revealAnswer;h+=`<div class="obsGameLayout"><div class="obsSegment obsSegmentQuestion panel">${tripletProgressHTML(t,p?.name)}<div class="question">${GameUI.esc(state.current?.q||'')}</div></div><div class="obsSegment obsSegmentMedia"></div><div class="obsSegment obsSegmentAnswer panel ${show?'':'is-empty'}">${show?`<div class="answer"><b>Правильна відповідь:</b> ${GameUI.esc(state.current?.a||'')}</div>`:''}</div><div class="obsSegment obsSegmentPlayers">${GameUI.playersHTML(state.players,t.answererId,state)}</div></div>`;}
- else if(['question','buzz','answering','cat_question','result','video_result'].includes(state.phase)){
-    const label=state.current?.type==='cat'?'🐈 КІТ У МІШКУ':'';
-    const catAnswerer=state.current?.type==='cat'&&state.catReceiver
-      ? state.players.find(p=>p.id===state.catReceiver) : null;
-    const catAnswererLabel=catAnswerer
-      ? `<div class="catAnswererLabel">ВІДПОВІДАЄ: <b>${GameUI.esc(catAnswerer.name)}</b></div>` : '';
-    const showingAnswer=['result','video_result'].includes(state.phase)&&state.revealAnswer;
-    const questionMedia=emojiQuestionHTML(state.current)+imageRevealHTML(state.current,false)+mediaQuestionHTML(state.current,false);
-    const resultMedia=showingAnswer?answerMediaHTML(state.current):'';
-    // Video/audio questions remain visible when the result appears; an answer illustration takes priority when supplied.
-    const media=resultMedia||questionMedia;
-    const answer=showingAnswer?`<div class="answer"><b>Правильна відповідь:</b> ${GameUI.esc(state.current?.a||'')}</div>`:state.phase==='answering'?`<div class="answer"><b>Відповідає:</b> ${GameUI.esc(state.players.find(p=>p.id===state.buzzer)?.name||'')}</div>`:'';
-    h+=`<div class="obsGameLayout">
-      <div class="obsSegment obsSegmentQuestion panel">${state.current?.type==='duel'?duelMatchupHTML():state.current?.type==='va_bank'?vaBankHeaderHTML():('<div class="center"><b>'+label+'</b></div>'+catAnswererLabel)}<div class="question">${GameUI.esc(state.current?.q||'')}</div></div>
+   ${state.players
+     .map(p => {
+       const done = submitted.includes(p.id);
+       const label = done ? "✅ Відповів" : status === "expired" ? "❌ Немає відповіді" : "⏳ Думає";
+       return `<div style="display:flex;justify-content:space-between;align-items:center;padding:9px 14px;border:1px solid #3a2b60;border-radius:12px;background:rgba(255,255,255,.025);font-size:17px"><b>${GameUI.esc(p.name)}</b><span>${label}</span></div>`;
+     })
+     .join("")}
+   </div></div>`;
+        } else if (state.phase === "first_turn_result") {
+          const q = state.firstTurnQuiz,
+            results = q.results || [],
+            revealCount = q.revealCount || 0;
+          const revealed = results.slice(Math.max(0, results.length - revealCount)).reverse();
+          h += `<div class="panel center"><div class="huge">${q.correctAnswer}</div><h2>ПРАВИЛЬНА ВІДПОВІДЬ</h2><p class="muted">${GameUI.esc(q.unit || "")}</p>
+   <div class="finalList" style="margin-top:22px">${revealed
+     .map(r => {
+       const place = results.findIndex(x => x.id === r.id) + 1;
+       return `<div class="finalItem" style="padding:14px 20px;min-height:58px"><span class="winner" style="font-size:28px">${place === 1 ? "🥇 " : ""}${place}. ${GameUI.esc(r.name)}</span><span style="font-size:21px;line-height:1.25">${r.noAnswer ? "<b>— НЕМАЄ ВІДПОВІДІ</b>" : `Відповідь: <b style="font-size:25px">${r.answer}</b> &nbsp; • &nbsp; Різниця: <b style="font-size:25px">${r.diff}</b>`}</span></div>`;
+     })
+     .join("")}</div>
+   ${revealCount === 0 ? '<p class="muted" style="margin-top:24px">Готуємо результати…</p>' : ""}
+   </div>`;
+        } else if (state.phase === "numeric_ready") {
+          const n = state.numericChallenge || {};
+          h += `<div class="panel center"><div class="huge">🔢 30</div><h1>ЧИСЛОВЕ ПИТАННЯ • ${n.value} БАЛІВ</h1><div class="question">${GameUI.esc(n.question || "")}</div><h2>⏳ ЧЕКАЄМО СТАРТУ ВЕДУЧОГО</h2></div>`;
+        } else if (state.phase === "numeric_question") {
+          const n = state.numericChallenge || {},
+            sub = n.submittedPlayerIds || [],
+            left = Math.max(0, Math.ceil(Number(n.remainingMs || 0) / 1000));
+          h += `<div class="panel center"><div class="huge">🔢 <span id="numericTimer">${left}</span></div><h1>ЧИСЛОВЕ ПИТАННЯ • ${n.value} БАЛІВ</h1><div class="question">${GameUI.esc(n.question || "")}</div><div class="finalList">${state.players.map(p => `<div class="finalItem"><span>${GameUI.esc(p.name)}</span><b>${sub.includes(p.id) ? "✅ Відповів" : "⏳ Думає"}</b></div>`).join("")}</div></div>`;
+        } else if (state.phase === "numeric_result") {
+          const n = state.numericChallenge || {},
+            rs = n.results || [],
+            rev = n.revealCount || 0,
+            revealed = rs.slice(Math.max(0, rs.length - rev)).reverse();
+          h += `<div class="panel center"><div class="huge">${n.correctAnswer}</div><h2>ПРАВИЛЬНА ВІДПОВІДЬ</h2><div class="finalList">${revealed
+            .map(r => {
+              const place = rs.findIndex(x => x.id === r.id) + 1;
+              return `<div class="finalItem"><span class="winner">${place === 1 ? "🥇 " : ""}${place}. ${GameUI.esc(r.name)}</span><span>${r.noAnswer ? "— НЕМАЄ ВІДПОВІДІ" : `Відповідь: <b>${r.answer}</b> • різниця: <b>${r.diff}</b>${place === 1 ? " • +" + n.value : ""}`}</span></div>`;
+            })
+            .join("")}</div></div>`;
+        } else if (state.phase === "board" && tripletFinishPreview?.until > Date.now() && !state.selectedTile) {
+          const snap = tripletFinishPreview;
+          h += `<div class="obsGameLayout"><div class="obsSegment obsSegmentQuestion panel">${tripletProgressHTML(snap.triplet, snap.name)}<div class="tripletSummaryText">🏁 ТРИПЛЕТ ЗАВЕРШЕНО!</div></div><div class="obsSegment obsSegmentMedia"></div><div class="obsSegment obsSegmentAnswer panel is-empty"></div><div class="obsSegment obsSegmentPlayers">${GameUI.playersHTML(state.players, snap.answererId, state)}</div></div>`;
+        } else if (state.phase === "board") {
+          let chooser = state.players.find(p => p.id === state.turnPlayerId);
+          h += `<div class="center" style="margin:8px 0 22px;font-size:30px;line-height:1.2;font-weight:700">🎯 Питання обирає: <b style="font-size:36px">${GameUI.esc(chooser?.name || "—")}</b></div>${GameUI.boardHTML(data, state, false)}${GameUI.playersHTML(state.players, null, state)}`;
+        } else if (state.phase === "audience_lobby") {
+          const a = state.audience || {};
+          h += `<div class="panel center"><div style="font-size:26px;font-weight:900;letter-spacing:.15em">👥 ГРАЮТЬ ГЛЯДАЧІ</div><h1 style="font-size:52px">${GameUI.esc(a.title || "")}</h1><img class="audQr" src="/audience-qr/${state.code}"><h2>Скануй QR • введи нік • забирай приз</h2><p style="font-size:24px">У грі: <b id="audienceJoined">${a.joined || 0}</b></p></div>`;
+        } else if (state.phase === "audience_question") {
+          const a = state.audience || {},
+            left = Math.max(0, Number(a.remainingMs || 0) / 1000);
+          h += `<div class="panel center"><div class="huge" id="audienceTimer">${left}.0</div><h2>ГЛЯДАЧІ • ПИТАННЯ ${a.questionIndex + 1}/${a.totalQuestions}</h2><div class="question">${GameUI.esc(a.question || "")}</div><div class="audGrid">${(a.options || []).map((o, i) => `<div class="audOpt">${"ABCD"[i]} • ${GameUI.esc(o)}</div>`).join("")}</div><p style="font-size:22px">Відповіли: <b id="audienceSubmitted">${a.submitted || 0}/${a.joined || 0}</b></p></div>`;
+        } else if (state.phase === "audience_result") {
+          const a = state.audience || {},
+            total = Math.max(1, a.submitted || 0);
+          h += `<div class="panel center"><h2>ПРАВИЛЬНА ВІДПОВІДЬ</h2><div class="huge">${"ABCD"[a.correct]} • ${GameUI.esc(a.options?.[a.correct] || "")}</div><div class="audGrid">${(a.options || []).map((o, i) => `<div class="audOpt" style="${i === a.correct ? "border:2px solid rgba(100,255,160,.8)" : ""}">${"ABCD"[i]} • ${GameUI.esc(o)} — <b>${Math.round(((a.counts?.[i] || 0) * 100) / total)}%</b></div>`).join("")}</div><p style="font-size:22px">${GameUI.esc(a.fact || "")}</p></div>`;
+        } else if (state.phase === "audience_podium") {
+          const a = state.audience || {},
+            rs = (a.ranking || []).slice(0, 5),
+            rev = a.revealCount || 0,
+            n = Math.min(5, rs.length),
+            shown = rs.slice(Math.max(0, n - rev), n).reverse(),
+            latest = shown[shown.length - 1];
+          h += `<div class="panel center"><h1>🏆 ${GameUI.esc(a.title || "")}</h1>${latest ? `<div style="font-size:34px;font-weight:900">${rs.indexOf(latest) + 1 === 1 ? "🥇 ПЕРЕМОЖЕЦЬ" : rs.indexOf(latest) + 1 + " МІСЦЕ"}</div><div class="winner" style="font-size:72px">${GameUI.esc(latest.name)}</div><div style="font-size:28px">${latest.correct}/3 правильних • ${(latest.timeMs / 1000).toFixed(2)} с</div>` : '<div class="huge">ТОП-5</div>'}${
+            shown.length > 1
+              ? `<div class="finalList">${shown
+                  .slice(0, -1)
+                  .map(
+                    r =>
+                      `<div class="finalItem"><span>${GameUI.esc(r.name)}</span><b>${r.correct}/3 • ${(r.timeMs / 1000).toFixed(2)} с</b></div>`,
+                  )
+                  .join("")}</div>`
+              : ""
+          }</div>`;
+        } else if (["triplet_question", "triplet_result"].includes(state.phase)) {
+          const t = state.current?.triplet || {},
+            p = state.players.find(x => x.id === t.answererId),
+            show = state.phase === "triplet_result" && state.revealAnswer;
+          h += `<div class="obsGameLayout"><div class="obsSegment obsSegmentQuestion panel">${tripletProgressHTML(t, p?.name)}<div class="question">${GameUI.esc(state.current?.q || "")}</div></div><div class="obsSegment obsSegmentMedia"></div><div class="obsSegment obsSegmentAnswer panel ${show ? "" : "is-empty"}">${show ? `<div class="answer"><b>Правильна відповідь:</b> ${GameUI.esc(state.current?.a || "")}</div>` : ""}</div><div class="obsSegment obsSegmentPlayers">${GameUI.playersHTML(state.players, t.answererId, state)}</div></div>`;
+        } else if (["question", "buzz", "answering", "cat_question", "result", "video_result"].includes(state.phase)) {
+          const label = state.current?.type === "cat" ? "🐈 КІТ У МІШКУ" : "";
+          const catAnswerer =
+            state.current?.type === "cat" && state.catReceiver
+              ? state.players.find(p => p.id === state.catReceiver)
+              : null;
+          const catAnswererLabel = catAnswerer
+            ? `<div class="catAnswererLabel">ВІДПОВІДАЄ: <b>${GameUI.esc(catAnswerer.name)}</b></div>`
+            : "";
+          const showingAnswer = ["result", "video_result"].includes(state.phase) && state.revealAnswer;
+          const questionMedia =
+            emojiQuestionHTML(state.current)
+            + imageRevealHTML(state.current, false)
+            + mediaQuestionHTML(state.current, false);
+          const resultMedia = showingAnswer ? answerMediaHTML(state.current) : "";
+          // Video/audio questions remain visible when the result appears; an answer illustration takes priority when supplied.
+          const media = resultMedia || questionMedia;
+          const answer = showingAnswer
+            ? `<div class="answer"><b>Правильна відповідь:</b> ${GameUI.esc(state.current?.a || "")}</div>`
+            : state.phase === "answering"
+              ? `<div class="answer"><b>Відповідає:</b> ${GameUI.esc(state.players.find(p => p.id === state.buzzer)?.name || "")}</div>`
+              : "";
+          h += `<div class="obsGameLayout">
+      <div class="obsSegment obsSegmentQuestion panel">${state.current?.type === "duel" ? duelMatchupHTML() : state.current?.type === "va_bank" ? vaBankHeaderHTML() : '<div class="center"><b>' + label + "</b></div>" + catAnswererLabel}<div class="question">${GameUI.esc(state.current?.q || "")}</div></div>
       <div class="obsSegment obsSegmentMedia">${media}</div>
-      <div class="obsSegment obsSegmentAnswer panel ${answer?'':'is-empty'}">${answer}</div>
-      <div class="obsSegment obsSegmentPlayers">${GameUI.playersHTML(state.players,state.buzzer,state)}</div>
+      <div class="obsSegment obsSegmentAnswer panel ${answer ? "" : "is-empty"}">${answer}</div>
+      <div class="obsSegment obsSegmentPlayers">${GameUI.playersHTML(state.players, state.buzzer, state)}</div>
     </div>`;
-  }
- else if(state.phase==='va_bank_bet')h+=`<div class="obsGameLayout"><div class="obsSegment obsSegmentQuestion panel">${vaBankHeaderHTML()}</div><div class="obsSegment obsSegmentMedia"></div><div class="obsSegment obsSegmentAnswer panel is-empty"></div><div class="obsSegment obsSegmentPlayers">${GameUI.playersHTML(state.players,null,state)}</div></div>`;
- else if(state.phase==='va_bank_question')h+=`<div class="obsGameLayout"><div class="obsSegment obsSegmentQuestion panel">${vaBankHeaderHTML()}<div class="question">${GameUI.esc(state.current?.q||'')}</div>${emojiQuestionHTML(state.current)}</div><div class="obsSegment obsSegmentMedia"></div><div class="obsSegment obsSegmentAnswer panel is-empty"></div><div class="obsSegment obsSegmentPlayers">${GameUI.playersHTML(state.players,null,state)}</div></div>`;
- else if(state.phase==='duel_choose')h+=`<div class="obsGameLayout"><div class="obsSegment obsSegmentQuestion panel">${duelMatchupHTML()}<div class="question">Очікуємо вибір суперника…</div></div><div class="obsSegment obsSegmentMedia"></div><div class="obsSegment obsSegmentAnswer panel is-empty"></div><div class="obsSegment obsSegmentPlayers">${GameUI.playersHTML(state.players,null,state)}</div></div>`;
- else if(state.phase==='duel_question')h+=`<div class="obsGameLayout"><div class="obsSegment obsSegmentQuestion panel">${duelMatchupHTML()}<div class="question">${GameUI.esc(state.current?.q||'')}</div></div><div class="obsSegment obsSegmentMedia"></div><div class="obsSegment obsSegmentAnswer panel is-empty"></div><div class="obsSegment obsSegmentPlayers">${GameUI.playersHTML(state.players,null,state)}</div></div>`;
- else if(state.phase==='cat_choose')h+=`<div class="panel center"><div class="huge">🐈</div><h1>КІТ У МІШКУ</h1><p>Ведучий обирає гравця</p></div>${GameUI.playersHTML(state.players,null,state)}`;
- else if(state.phase==='final_bets')h+=`<div class="panel center"><div class="huge">ФІНАЛ</div><h2>Таємні ставки</h2></div>${GameUI.playersHTML(state.players,null,state)}`;
- else if(state.phase==='final_ready')h+=`<div class="panel"><div class="center"><div class="huge">ФІНАЛ</div><p class="muted">Таймер ще не запущено</p></div><div class="question">${GameUI.esc(state.current?.q||'')}</div></div>${GameUI.playersHTML(state.players,null,state)}`;
- else if(state.phase==='final_question')h+=`<div class="panel"><div class="center">${Number(state.finalSeconds)>0?`<div class="huge">${state.finalSeconds}</div>`:'<div class="huge" style="font-size:clamp(32px,5vw,64px)">Отримання результатів</div>'}</div><div class="question">${GameUI.esc(state.current?.q||'')}</div></div>${GameUI.playersHTML(state.players,null,state)}`;
- else if(state.phase==='final_review')h+=`<div class="panel center"><h1>Фінал завершено</h1><p>Ведучий перевіряє відповіді</p></div>${GameUI.playersHTML(state.players,null,state)}`;
- else if(state.phase==='final_result'){
-   if(state.seasonCeremonyActive&&state.seasonFinal?.leaderboard?.length){
-     const rs=state.seasonFinal.leaderboard,total=rs.length,shown=Math.min(state.seasonRevealCount||0,total),revealed=[];
-     for(let n=0;n<shown;n++){const idx=total-1-n;if(idx>=0)revealed.push({p:rs[idx],place:idx+1});}
-     const latest=revealed[revealed.length-1];
-     const championFX=latest?.place===1?`<div class="seasonConfetti">${Array.from({length:46},(_,i)=>`<i style="--x:${(i*37)%100}%;--h:${(i*71)%360};--d:${2.4+(i%7)*.22}s;--delay:${-(i%11)*.23}s;--r:${i*29}deg"></i>`).join('')}${Array.from({length:22},(_,i)=>`<i class="pop" style="--x:${i%2?92:7}%;--h:${(i*83)%360};--delay:${-(i%8)*.15}s;--dx:${i%2?-1:1}${50+(i%6)*18}px;--dy:-${80+(i%7)*24}px"></i>`).join('')}</div><div class="seasonCannon left">🎉</div><div class="seasonCannon right">🎉</div>`:''; h+=`<div class="panel center ${latest?.place===1?'seasonChampionStage':''}">${championFX}<div style="font-size:24px;letter-spacing:.18em;font-weight:800;opacity:.8">SMOKERLOL • ${GameUI.esc(state.seasonFinal.name||'СЕЗОН')}</div>${!latest?`<div class="huge" style="margin-top:34px">👑</div><h1 style="font-size:54px">СЕЗОННІ ПІДСУМКИ</h1><p class="muted" style="font-size:24px">Grand Final • подвійні сезонні очки</p>`:`<div style="margin-top:26px;font-size:34px;font-weight:900">${latest.place===1?'👑 ЧЕМПІОН СЕЗОНУ':latest.place+' МІСЦЕ СЕЗОНУ'}</div><div class="winner" style="font-size:clamp(52px,7vw,92px);line-height:1.05;margin:12px 0 20px">${GameUI.esc(latest.p.name)}</div><div class="huge" style="font-size:clamp(64px,8vw,110px);margin-top:4px">${latest.p.seasonPoints}</div><div class="muted" style="font-size:22px">СЕЗОННИХ БАЛІВ</div><div style="font-size:22px;margin-top:12px;opacity:.8">${latest.p.wins} перемог • ${latest.p.podiums} подіумів</div>`}${revealed.length>1?`<div style="display:flex;gap:12px;justify-content:center;flex-wrap:wrap;margin-top:28px">${revealed.slice(0,-1).map(x=>`<div style="padding:10px 18px;border:1px solid rgba(255,255,255,.16);border-radius:14px;background:rgba(0,0,0,.18);font-size:19px"><b>${x.place}.</b> ${GameUI.esc(x.p.name)} — <b>${x.p.seasonPoints}</b></div>`).join('')}</div>`:''}</div>`;
-   }else{
-     const total=state.finalResults?.length||0, shown=Math.min(state.finalRevealCount||0,total), revealed=[];
-     for(let n=0;n<shown;n++){const idx=total-1-n;if(idx>=0)revealed.push({p:state.finalResults[idx],place:idx+1});}
-     const latest=revealed[revealed.length-1];
-     h+=`<div class="panel center"><div style="font-size:24px;letter-spacing:.18em;font-weight:800;opacity:.8">SMOKERLOL • ФІНАЛ</div>${!latest?`<div class="huge" style="margin-top:34px">🏆</div><h1 style="font-size:54px">ФІНАЛЬНІ РЕЗУЛЬТАТИ</h1><p class="muted" style="font-size:24px">Готуємо церемонію нагородження…</p>`:`<div style="margin-top:26px;font-size:34px;font-weight:900">${latest.place===1?'🏆 ПЕРЕМОЖЕЦЬ':latest.place+' МІСЦЕ'}</div><div class="winner" style="font-size:clamp(52px,7vw,92px);line-height:1.05;margin:12px 0 20px">${GameUI.esc(latest.p.name)}</div><div style="font-size:23px;opacity:.8">Фінальна відповідь</div><div class="answer" style="font-size:clamp(28px,3vw,44px);margin:10px auto;max-width:1000px">${GameUI.esc(latest.p.finalAnswer||'—')} ${latest.p.correct?'✅':'❌'}</div><div style="font-size:25px;margin-top:18px">${latest.p.beforeScore} ${latest.p.correct?'+':'−'} ${latest.p.bet} =</div><div class="huge" style="font-size:clamp(64px,8vw,110px);margin-top:4px">${latest.p.score}</div><div class="muted" style="font-size:22px">БАЛІВ</div>`}${revealed.length>1?`<div style="display:flex;gap:12px;justify-content:center;flex-wrap:wrap;margin-top:28px">${revealed.slice(0,-1).map(x=>`<div style="padding:10px 18px;border:1px solid rgba(255,255,255,.16);border-radius:14px;background:rgba(0,0,0,.18);font-size:19px"><b>${x.place}.</b> ${GameUI.esc(x.p.name)} — <b>${x.p.score}</b></div>`).join('')}</div>`:''}</div>`;
-   }
- }
- const mediaSnapshot=captureMediaPlayback();stopDetachedMedia(mediaSnapshot);app.innerHTML=h;restoreMediaPlayback(mediaSnapshot);limitMediaPreview();syncObsMediaFromState();flushPendingObsMedia();applyAnswererHighlight();applyVoiceHighlight();fitQuestionToOBS();armFirstTurnClock();armNumericClock();armAudienceClock()}
-</script></body></html>
+        } else if (state.phase === "va_bank_bet")
+          h += `<div class="obsGameLayout"><div class="obsSegment obsSegmentQuestion panel">${vaBankHeaderHTML()}</div><div class="obsSegment obsSegmentMedia"></div><div class="obsSegment obsSegmentAnswer panel is-empty"></div><div class="obsSegment obsSegmentPlayers">${GameUI.playersHTML(state.players, null, state)}</div></div>`;
+        else if (state.phase === "va_bank_question")
+          h += `<div class="obsGameLayout"><div class="obsSegment obsSegmentQuestion panel">${vaBankHeaderHTML()}<div class="question">${GameUI.esc(state.current?.q || "")}</div>${emojiQuestionHTML(state.current)}</div><div class="obsSegment obsSegmentMedia"></div><div class="obsSegment obsSegmentAnswer panel is-empty"></div><div class="obsSegment obsSegmentPlayers">${GameUI.playersHTML(state.players, null, state)}</div></div>`;
+        else if (state.phase === "duel_choose")
+          h += `<div class="obsGameLayout"><div class="obsSegment obsSegmentQuestion panel">${duelMatchupHTML()}<div class="question">Очікуємо вибір суперника…</div></div><div class="obsSegment obsSegmentMedia"></div><div class="obsSegment obsSegmentAnswer panel is-empty"></div><div class="obsSegment obsSegmentPlayers">${GameUI.playersHTML(state.players, null, state)}</div></div>`;
+        else if (state.phase === "duel_question")
+          h += `<div class="obsGameLayout"><div class="obsSegment obsSegmentQuestion panel">${duelMatchupHTML()}<div class="question">${GameUI.esc(state.current?.q || "")}</div></div><div class="obsSegment obsSegmentMedia"></div><div class="obsSegment obsSegmentAnswer panel is-empty"></div><div class="obsSegment obsSegmentPlayers">${GameUI.playersHTML(state.players, null, state)}</div></div>`;
+        else if (state.phase === "cat_choose")
+          h += `<div class="panel center"><div class="huge">🐈</div><h1>КІТ У МІШКУ</h1><p>Ведучий обирає гравця</p></div>${GameUI.playersHTML(state.players, null, state)}`;
+        else if (state.phase === "final_bets")
+          h += `<div class="panel center"><div class="huge">ФІНАЛ</div><h2>Таємні ставки</h2></div>${GameUI.playersHTML(state.players, null, state)}`;
+        else if (state.phase === "final_ready")
+          h += `<div class="panel"><div class="center"><div class="huge">ФІНАЛ</div><p class="muted">Таймер ще не запущено</p></div><div class="question">${GameUI.esc(state.current?.q || "")}</div></div>${GameUI.playersHTML(state.players, null, state)}`;
+        else if (state.phase === "final_question")
+          h += `<div class="panel"><div class="center">${Number(state.finalSeconds) > 0 ? `<div class="huge">${state.finalSeconds}</div>` : '<div class="huge" style="font-size:clamp(32px,5vw,64px)">Отримання результатів</div>'}</div><div class="question">${GameUI.esc(state.current?.q || "")}</div></div>${GameUI.playersHTML(state.players, null, state)}`;
+        else if (state.phase === "final_review")
+          h += `<div class="panel center"><h1>Фінал завершено</h1><p>Ведучий перевіряє відповіді</p></div>${GameUI.playersHTML(state.players, null, state)}`;
+        else if (state.phase === "final_result") {
+          if (state.seasonCeremonyActive && state.seasonFinal?.leaderboard?.length) {
+            const rs = state.seasonFinal.leaderboard,
+              total = rs.length,
+              shown = Math.min(state.seasonRevealCount || 0, total),
+              revealed = [];
+            for (let n = 0; n < shown; n++) {
+              const idx = total - 1 - n;
+              if (idx >= 0) revealed.push({ p: rs[idx], place: idx + 1 });
+            }
+            const latest = revealed[revealed.length - 1];
+            const championFX =
+              latest?.place === 1
+                ? `<div class="seasonConfetti">${Array.from({ length: 46 }, (_, i) => `<i style="--x:${(i * 37) % 100}%;--h:${(i * 71) % 360};--d:${2.4 + (i % 7) * 0.22}s;--delay:${-(i % 11) * 0.23}s;--r:${i * 29}deg"></i>`).join("")}${Array.from({ length: 22 }, (_, i) => `<i class="pop" style="--x:${i % 2 ? 92 : 7}%;--h:${(i * 83) % 360};--delay:${-(i % 8) * 0.15}s;--dx:${i % 2 ? -1 : 1}${50 + (i % 6) * 18}px;--dy:-${80 + (i % 7) * 24}px"></i>`).join("")}</div><div class="seasonCannon left">🎉</div><div class="seasonCannon right">🎉</div>`
+                : "";
+            h += `<div class="panel center ${latest?.place === 1 ? "seasonChampionStage" : ""}">${championFX}<div style="font-size:24px;letter-spacing:.18em;font-weight:800;opacity:.8">SMOKERLOL • ${GameUI.esc(state.seasonFinal.name || "СЕЗОН")}</div>${!latest ? `<div class="huge" style="margin-top:34px">👑</div><h1 style="font-size:54px">СЕЗОННІ ПІДСУМКИ</h1><p class="muted" style="font-size:24px">Grand Final • подвійні сезонні очки</p>` : `<div style="margin-top:26px;font-size:34px;font-weight:900">${latest.place === 1 ? "👑 ЧЕМПІОН СЕЗОНУ" : latest.place + " МІСЦЕ СЕЗОНУ"}</div><div class="winner" style="font-size:clamp(52px,7vw,92px);line-height:1.05;margin:12px 0 20px">${GameUI.esc(latest.p.name)}</div><div class="huge" style="font-size:clamp(64px,8vw,110px);margin-top:4px">${latest.p.seasonPoints}</div><div class="muted" style="font-size:22px">СЕЗОННИХ БАЛІВ</div><div style="font-size:22px;margin-top:12px;opacity:.8">${latest.p.wins} перемог • ${latest.p.podiums} подіумів</div>`}${
+              revealed.length > 1
+                ? `<div style="display:flex;gap:12px;justify-content:center;flex-wrap:wrap;margin-top:28px">${revealed
+                    .slice(0, -1)
+                    .map(
+                      x =>
+                        `<div style="padding:10px 18px;border:1px solid rgba(255,255,255,.16);border-radius:14px;background:rgba(0,0,0,.18);font-size:19px"><b>${x.place}.</b> ${GameUI.esc(x.p.name)} — <b>${x.p.seasonPoints}</b></div>`,
+                    )
+                    .join("")}</div>`
+                : ""
+            }</div>`;
+          } else {
+            const total = state.finalResults?.length || 0,
+              shown = Math.min(state.finalRevealCount || 0, total),
+              revealed = [];
+            for (let n = 0; n < shown; n++) {
+              const idx = total - 1 - n;
+              if (idx >= 0) revealed.push({ p: state.finalResults[idx], place: idx + 1 });
+            }
+            const latest = revealed[revealed.length - 1];
+            h += `<div class="panel center"><div style="font-size:24px;letter-spacing:.18em;font-weight:800;opacity:.8">SMOKERLOL • ФІНАЛ</div>${!latest ? `<div class="huge" style="margin-top:34px">🏆</div><h1 style="font-size:54px">ФІНАЛЬНІ РЕЗУЛЬТАТИ</h1><p class="muted" style="font-size:24px">Готуємо церемонію нагородження…</p>` : `<div style="margin-top:26px;font-size:34px;font-weight:900">${latest.place === 1 ? "🏆 ПЕРЕМОЖЕЦЬ" : latest.place + " МІСЦЕ"}</div><div class="winner" style="font-size:clamp(52px,7vw,92px);line-height:1.05;margin:12px 0 20px">${GameUI.esc(latest.p.name)}</div><div style="font-size:23px;opacity:.8">Фінальна відповідь</div><div class="answer" style="font-size:clamp(28px,3vw,44px);margin:10px auto;max-width:1000px">${GameUI.esc(latest.p.finalAnswer || "—")} ${latest.p.correct ? "✅" : "❌"}</div><div style="font-size:25px;margin-top:18px">${latest.p.beforeScore} ${latest.p.correct ? "+" : "−"} ${latest.p.bet} =</div><div class="huge" style="font-size:clamp(64px,8vw,110px);margin-top:4px">${latest.p.score}</div><div class="muted" style="font-size:22px">БАЛІВ</div>`}${
+              revealed.length > 1
+                ? `<div style="display:flex;gap:12px;justify-content:center;flex-wrap:wrap;margin-top:28px">${revealed
+                    .slice(0, -1)
+                    .map(
+                      x =>
+                        `<div style="padding:10px 18px;border:1px solid rgba(255,255,255,.16);border-radius:14px;background:rgba(0,0,0,.18);font-size:19px"><b>${x.place}.</b> ${GameUI.esc(x.p.name)} — <b>${x.p.score}</b></div>`,
+                    )
+                    .join("")}</div>`
+                : ""
+            }</div>`;
+          }
+        }
+        const mediaSnapshot = captureMediaPlayback();
+        stopDetachedMedia(mediaSnapshot);
+        app.innerHTML = h;
+        restoreMediaPlayback(mediaSnapshot);
+        limitMediaPreview();
+        syncObsMediaFromState();
+        flushPendingObsMedia();
+        applyAnswererHighlight();
+        applyVoiceHighlight();
+        fitQuestionToOBS();
+        armFirstTurnClock();
+        armNumericClock();
+        armAudienceClock();
+      }
+    </script>
+  </body>
+</html>
