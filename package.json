@@ -6,6 +6,7 @@
   "main": "server.js",
   "scripts": {
     "start": "node start.js",
+    "stop": "powershell -NoProfile -Command \"Get-NetTCPConnection -LocalPort 3100 -State Listen -ErrorAction SilentlyContinue | Select-Object -ExpandProperty OwningProcess -Unique | ForEach-Object { Stop-Process -Id $_ }\"",
     "start:server": "node server.js",
     "start:local": "powershell -NoProfile -ExecutionPolicy Bypass -File ./start-local.ps1"
   },
