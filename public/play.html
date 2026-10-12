@@ -105,7 +105,7 @@ async function ensureGameData(gameId){
 const params=new URLSearchParams(location.search);
 const urlCode=(params.get('room')||'').trim().toUpperCase();
 const savedCode=(localStorage.getItem('sgCode')||'').trim().toUpperCase();
-let state=null, code=urlCode||savedCode, playerId=localStorage.getItem('sgPlayerId')||'', name=localStorage.getItem('sgPlayerName')||'';
+let state=null, code=urlCode||savedCode, playerId=localStorage.getItem('sgPlayerId')||'', playerKey=localStorage.getItem('sgPlayerKey')||'', name=localStorage.getItem('sgPlayerName')||'';
 let joined=false, reconnectTried=false;
 let serverClockOffsetMs=0, syncSamples=[], syncTimer=null, buzzClock=null;
 function serverNow(){return Date.now()+serverClockOffsetMs}
@@ -130,11 +130,12 @@ function startClockSync(){if(syncTimer)clearInterval(syncTimer);syncSamples=[];f
 function setNetBadge(ok){const el=document.getElementById('netBadge');if(el)el.textContent=ok?'🟢 Онлайн':'🔴 Немає зв’язку'}
 socket.on('connect',()=>{
  setNetBadge(true); startClockSync();
- if(joined&&playerId&&code&&name){
-   socket.emit('joinPlayer',{code,name,playerId},r=>{
+ if(joined&&playerKey&&code&&name){
+   socket.emit('joinPlayer',{code,name,playerKey},r=>{
      if(r?.ok){
-       playerId=r.playerId;code=r.code;name=r.name;joined=true;
+       playerId=r.playerId;playerKey=r.playerKey;code=r.code;name=r.name;joined=true;
        localStorage.setItem('sgPlayerId',playerId);
+       localStorage.setItem('sgPlayerKey',playerKey);
        localStorage.setItem('sgCode',code);
        localStorage.setItem('sgPlayerName',name);
        if(r.state)applyJoinedState(r.state);
@@ -153,8 +154,8 @@ function applyJoinedState(s){
 
 
 function clearSession(keepName=true){
-  playerId=''; code=''; state=null; joined=false;
-  localStorage.removeItem('sgPlayerId'); localStorage.removeItem('sgCode');
+  playerId=''; playerKey=''; code=''; state=null; joined=false;
+  localStorage.removeItem('sgPlayerId'); localStorage.removeItem('sgPlayerKey'); localStorage.removeItem('sgCode');
   if(!keepName){ name=''; localStorage.removeItem('sgPlayerName'); }
 }
 function showError(msg){const e=document.getElementById('err');if(e){e.textContent=msg;e.classList.remove('hidden')}}
@@ -168,13 +169,13 @@ function login(prefill=urlCode||''){
     const newName=document.getElementById('name').value.trim();
     if(!newCode)return showError('Введіть код кімнати.');
     if(!newName)return showError("Введіть ім'я.");
-    // Якщо користувач свідомо вводить іншу кімнату — старий playerId не переносимо.
+    // Якщо користувач свідомо вводить іншу кімнату — старий ключ гравця не переносимо.
     const sameRoom=newCode===savedCode || newCode===code;
-    const idToUse=sameRoom?playerId:'';
-    socket.emit('joinPlayer',{code:newCode,name:newName,playerId:idToUse},r=>{
+    const keyToUse=sameRoom?playerKey:'';
+    socket.emit('joinPlayer',{code:newCode,name:newName,playerKey:keyToUse},r=>{
       if(!r.ok)return showError(r.error||'Не вдалося приєднатися.');
-      playerId=r.playerId; code=r.code; name=r.name; joined=true;
-      localStorage.setItem('sgPlayerId',playerId); localStorage.setItem('sgCode',code); localStorage.setItem('sgPlayerName',name);
+      playerId=r.playerId; playerKey=r.playerKey; code=r.code; name=r.name; joined=true;
+      localStorage.setItem('sgPlayerId',playerId); localStorage.setItem('sgPlayerKey',playerKey); localStorage.setItem('sgCode',code); localStorage.setItem('sgPlayerName',name);
       if(r.state)applyJoinedState(r.state);
       setTimeout(syncClockSample,60);
       history.replaceState(null,'',`/play?room=${encodeURIComponent(code)}`);
@@ -184,12 +185,12 @@ function login(prefill=urlCode||''){
 
 // Автовідновлення виконуємо лише коли URL не просить іншу кімнату.
 login(urlCode||savedCode);
-if(playerId&&savedCode&&name&&(!urlCode||urlCode===savedCode)){
+if(playerKey&&savedCode&&name&&(!urlCode||urlCode===savedCode)){
   reconnectTried=true;
-  socket.emit('joinPlayer',{code:savedCode,name,playerId},r=>{
+  socket.emit('joinPlayer',{code:savedCode,name,playerKey},r=>{
     if(!r.ok){clearSession(true);login(urlCode||'');return;}
-    playerId=r.playerId;code=r.code;name=r.name;joined=true;
-    localStorage.setItem('sgPlayerId',playerId);localStorage.setItem('sgCode',code);localStorage.setItem('sgPlayerName',name);
+    playerId=r.playerId;playerKey=r.playerKey;code=r.code;name=r.name;joined=true;
+    localStorage.setItem('sgPlayerId',playerId);localStorage.setItem('sgPlayerKey',playerKey);localStorage.setItem('sgCode',code);localStorage.setItem('sgPlayerName',name);
     if(r.state)applyJoinedState(r.state);
     setTimeout(syncClockSample,60);
   });
