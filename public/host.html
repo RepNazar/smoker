@@ -364,7 +364,23 @@ function bindHostAudioControls(){
  el.addEventListener('seeked',()=>send('seek'));
 }
 function bindHostMediaControls(){bindHostVideoControls();bindHostAudioControls();}
-function resumeVideoResult(){}
+// Continue only videos explicitly configured for post-answer playback.
+let autoResumedVideoKey='';
+function resumeVideoResult(){
+ const cur=state?.current;
+ if(state?.phase!=='result'){autoResumedVideoKey='';return;}
+ if(cur?.questionType!=='video'||!cur.videoContinued||!state.revealAnswer)return;
+ const question=data?.rounds?.[state.round]?.categories?.[cur.ci]?.questions?.[cur.qi];
+ if(question?.resumeOnAnswer!==true)return;
+ const key=[state.code,state.round,cur.ci,cur.qi].join(':');
+ if(autoResumedVideoKey===key)return;
+ const el=document.querySelector('video.quizVideo');
+ if(!el)return;
+ autoResumedVideoKey=key;
+ if(el.ended||!el.paused)return;
+ const playback=el.play(); // Existing hostVideoControl synchronizes OBS and players.
+ if(playback?.catch)playback.catch(err=>console.warn('Auto-resume video after answer:',err));
+}
 function limitMediaPreview(){
  const cur=state?.current;
  if(cur?.questionType==='video'&&cur.pauseAt){
