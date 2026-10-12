@@ -38,5 +38,13 @@
     "description": "Сезон 2 • Гра #1 • тест Раунду 1 і механіки ТРИПЛЕТ",
     "file": "season2_kinohardkor_2_0.json",
     "enabled": true
+  },
+  {
+    "id": "season2-general-knowledge-2",
+    "title": "ЗАГАЛЬНІ ЗНАННЯ 2.0",
+    "icon": "🧠",
+    "description": "Сезон 2 • Гра #2 • тест тільки категорії «Періодично цікаво»",
+    "file": "season2_general_knowledge_2_0.json",
+    "enabled": true
   }
 ]
