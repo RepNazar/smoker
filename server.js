@@ -1211,17 +1211,18 @@ io.on('connection', socket => {
     cb({ok:true,code:room.code});
   });
 
-  socket.on('joinAudience', ({code:c,name,audienceId}={},cb=()=>{})=>{
+  socket.on('joinAudience', ({code:c,name,audienceKey}={},cb=()=>{})=>{
     const room=getRoom(c); if(!room)return cb({ok:false,error:'Кімнату не знайдено.'});
-    let a=room.audience.find(x=>x.id===audienceId);
+    // Rejoin only with the secret key: audience ids are public (ranking, submittedPlayerIds).
+    let a=audienceKey?room.audience.find(x=>x.key===audienceKey):null;
     if(!a){
       if(room.phase!=='audience_lobby')return cb({ok:false,error:'Зараз реєстрація глядачів закрита.'});
       const clean=String(name||'').trim().slice(0,24); if(!clean)return cb({ok:false,error:'Введіть нік.'});
-      a={id:crypto.randomUUID(),name:clean,socketId:socket.id,connected:true,roundStats:{}}; room.audience.push(a);
+      a={id:crypto.randomUUID(),key:crypto.randomBytes(16).toString('hex'),name:clean,socketId:socket.id,connected:true,roundStats:{}}; room.audience.push(a);
     } else {a.socketId=socket.id;a.connected=true;if(name)a.name=String(name).trim().slice(0,24)||a.name;}
     socket.data.audienceId=a.id;socket.data.roomCode=room.code;socket.join(room.code);
     const ownWin=[...(room.audienceWinners||[])].reverse().find(x=>x.id===a.id)||null;
-    cb({ok:true,audienceId:a.id,name:a.name,code:room.code,joined:room.audience.filter(x=>x.connected).length,prizeCode:ownWin?.code||''});
+    cb({ok:true,audienceId:a.id,audienceKey:a.key,name:a.name,code:room.code,joined:room.audience.filter(x=>x.connected).length,prizeCode:ownWin?.code||''});
     io.to(room.code).emit('audienceProgress',{code:room.code,joined:room.audience.filter(x=>x.connected).length,submitted:Object.keys(room.audienceAnswers||{}).length,roundIndex:room.audienceRoundIndex,questionIndex:room.audienceQuestionIndex,remainingMs:room.audienceEndsAt?Math.max(0,room.audienceEndsAt-Date.now()):0});
   });
 
