@@ -73,6 +73,8 @@ const hostMurlocAudio=new Audio('/media/murloc.mp3');hostMurlocAudio.preload='au
 socket.on('cue',e=>{if(e?.type==='murloc_answer'){hostMurlocAudio.pause();hostMurlocAudio.currentTime=0;hostMurlocAudio.play().catch(err=>console.warn('Host Murloc audio:',err));return;}if(!playHostFinalMusic(e?.type))playCueSound(e?.type);});
  let voiceMappings={},voiceTestIds=[],voicePanelOpen=false,voiceDraftIds={},voiceBotStatus='unknown',voiceBotError='';
 let state=null,data=null,gamesList=[],seasonAdminToken='',selectedGameId='',hostSpecialCells={},code='',hostToken=localStorage.getItem('sgHostToken')||'',storedCode=localStorage.getItem('sgRoomCode')||'',hostAudienceWinner=null;
+// Host key: opened once as /host?key=..., then remembered in this browser and hidden from the address bar.
+const hostKey=(()=>{const u=new URL(location.href),k=u.searchParams.get('key');if(k){localStorage.setItem('sgHostKey',k);u.searchParams.delete('key');history.replaceState(null,'',u.pathname+u.search+u.hash)}return k||localStorage.getItem('sgHostKey')||''})();
 function setNetBadge(ok){
  const el=document.getElementById('netBadge');if(!el)return;
  el.textContent=ok?'🟢 Сервер підключено':'🔴 З’єднання втрачено';
@@ -107,7 +109,7 @@ function armFirstTurnClock(){
 }
 
 async function loadGameData(gameId){
- const r=await fetch(`/games/${encodeURIComponent(gameId)}.json`,{cache:'no-store'});
+ const r=await fetch(`/games/${encodeURIComponent(gameId)}.json?key=${encodeURIComponent(hostKey)}`,{cache:'no-store'});
  if(!r.ok) throw new Error('Game HTTP '+r.status);
  data=await r.json();
 }
@@ -149,7 +151,7 @@ function renderStart(){
 function seasonPointsWordStart(n){n=Math.abs(Number(n)||0)%100;const n10=n%10;if(n>10&&n<20)return 'балів';if(n10===1)return 'бал';if(n10>=2&&n10<=4)return 'бали';return 'балів'}
 function loadStartSeasonAdmin(){
  const area=document.getElementById('startSeasonAdmin');if(!area)return;
- socket.emit('seasonAdminInit',{},r=>{
+ socket.emit('seasonAdminInit',{hostKey},r=>{
    if(!r?.ok){area.innerHTML=`<p>${GameUI.esc(r?.error||'Помилка')}</p>`;return}
    seasonAdminToken=r.adminToken||seasonAdminToken;
    fetch('/api/seasons',{cache:'no-store'}).then(x=>x.json()).then(payload=>{
@@ -168,7 +170,7 @@ function loadStartSeasonAdmin(){
 async function createRoom(gameId){
  selectedGameId=gameId;
  await loadGameData(gameId);
- socket.emit('createRoom',{hostToken:crypto.randomUUID(),gameId},r=>{
+ socket.emit('createRoom',{hostToken:crypto.randomUUID(),gameId,hostKey},r=>{
    if(!r.ok){alert(r.error||'Не вдалося створити кімнату');return}
    code=r.code;hostToken=r.hostToken;state=r.state||state;hostSpecialCells=r.specialCells||{};
    localStorage.setItem('sgHostToken',hostToken);localStorage.setItem('sgRoomCode',code);

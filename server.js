@@ -19,6 +19,11 @@ const app = express();
 const server = http.createServer(app);
 const io = new Server(server, { cors: { origin: true, credentials: true }, pingInterval: 5000, pingTimeout: 20000 });
 const PORT = process.env.PORT || 3000;
+// HOST_KEY (.env; start-local.ps1 creates it once): only its holder can create rooms,
+// manage seasons and read full game JSON. Not set = open access, as before.
+const HOST_KEY = String(process.env.HOST_KEY || '').trim();
+const HOST_KEY_ERROR = 'Потрібен ключ ведучого: відкрийте /host за посиланням із ключем.';
+function hostKeyOk(key) { return !HOST_KEY || key === HOST_KEY; }
 const gamesIndex = JSON.parse(fs.readFileSync(path.join(__dirname, 'games', 'index.json'), 'utf8'));
 const games = new Map();
 for (const meta of gamesIndex.filter(g => g.enabled !== false)) {
@@ -55,7 +60,6 @@ app.get('/audience', (_, res) => res.sendFile(path.join(__dirname, 'public', 'au
 app.get('/audience/:code', (_, res) => res.sendFile(path.join(__dirname, 'public', 'audience.html')));
 app.get('/audience-qr/:code', async (req,res)=>{try{const c=String(req.params.code||'').toUpperCase();const forwardProto=String(req.get('x-forwarded-proto')||'').split(',')[0].trim().toLowerCase();const safeProto=forwardProto==='https'?'https':req.protocol;const base=`${safeProto}://${req.get('host')}`;const svg=await QRCode.toString(`${base}/audience/${encodeURIComponent(c)}`,{type:'svg',margin:1,width:360,errorCorrectionLevel:'M'});res.type('image/svg+xml').send(svg)}catch(e){res.status(500).send('QR error')}});
 
-app.get('/questions.json', (_, res) => res.sendFile(path.join(__dirname, 'questions.json')));
 app.get('/games', (_, res) => res.json(gamesIndex.filter(g => g.enabled !== false).map(({file, ...g}) => g)));
 app.get('/games/:id.json', (req, res) => {
   const meta = gamesIndex.find(g => g.id === req.params.id && g.enabled !== false);
@@ -64,7 +68,9 @@ app.get('/games/:id.json', (req, res) => {
   const game = games.get(meta.id);
   if (!game) return res.status(404).json({ error: 'Гру не знайдено.' });
   const { specialSetup, specialPools, ...publicGame } = game;
-  res.json(publicGame);
+  if (hostKeyOk(req.query.key)) return res.json(publicGame);
+  // Without the key: only what the OBS board needs (category names, values). No questions or answers.
+  res.json({ id: game.id, rounds: (game.rounds || []).map(r => ({ categories: (r.categories || []).map(c => ({ name: c.name, questions: (c.questions || []).map(q => ({ value: q.value })) })) })) });
 });
 app.get('/screen', (_, res) => res.sendFile(path.join(__dirname, 'public', 'screen.html')));
 app.get('/screen/:code', (_, res) => res.sendFile(path.join(__dirname, 'public', 'screen.html')));
@@ -384,7 +390,8 @@ function randomSpecialCells(room) {
 
 io.on('connection', socket => {
   socket.data.seasonAdminToken = crypto.randomUUID();
-  socket.on('createRoom', ({ hostToken, gameId } = {}, cb = () => {}) => {
+  socket.on('createRoom', ({ hostToken, gameId, hostKey } = {}, cb = () => {}) => {
+    if (!hostKeyOk(hostKey)) return cb({ ok:false, error:HOST_KEY_ERROR });
     const selectedGame = getGameById(gameId);
     if (!selectedGame) return cb({ ok:false, error:'Гру не знайдено.' });
     const roomCode = code();
@@ -1358,7 +1365,8 @@ io.on('connection', socket => {
   });
 
 
-  socket.on('seasonAdminInit', async (_, cb=()=>{})=>{
+  socket.on('seasonAdminInit', async (payload, cb=()=>{})=>{
+    if(!hostKeyOk(payload?.hostKey))return cb({ok:false,error:HOST_KEY_ERROR});
     try{cb({ok:true,adminToken:socket.data.seasonAdminToken,seasons:await storage.listSeasons()})}
     catch(e){cb({ok:false,error:e.message})}
   });
@@ -1501,6 +1509,7 @@ function startOptionalVoiceBot(){
 }
 storage.init().then(()=>server.listen(PORT,'0.0.0.0',()=>{
   console.log(`SMOKERLOL v3.0.0-rc: http://0.0.0.0:${PORT}`);
+  if (!HOST_KEY) console.warn('HOST_KEY is not set: anyone can create rooms, manage seasons and read game answers.');
   startOptionalVoiceBot();
 })).catch(err=>{console.error('Storage init failed:',err);process.exit(1)});
 
