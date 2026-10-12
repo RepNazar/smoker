@@ -657,22 +657,19 @@ io.on("connection", socket => {
     // Do not rebroadcast it and rebuild active media on every client.
   });
 
-  socket.on("joinPlayer", ({ code: c, name, playerId }, cb = () => {}) => {
+  socket.on("joinPlayer", ({ code: c, name, playerKey }, cb = () => {}) => {
     const room = getRoom(c);
     if (!room) return cb({ ok: false, error: "Кімнату не знайдено." });
-    let p = room.players.find(x => x.id === playerId);
+    // Rejoin only with the secret key: player ids are public (state.players).
+    let p = playerKey ? room.players.find(x => x.key === playerKey) : null;
     const reconnectingExistingPlayer = !!p;
     if (!p) {
       if (room.phase !== "lobby")
         return cb({ ok: false, error: "Гра вже почалася. Поверніться з того самого пристрою/профілю." });
       if (room.players.length >= 4) return cb({ ok: false, error: "У кімнаті вже 4 гравці." });
       const clean =
-        String(name || "")
-          .trim()
-          .slice(0, 20) || `Гравець ${room.players.length + 1}`;
-      p = {
-        id: crypto.randomUUID(),
-        name: clean,
+        String(name || "").trim().slice(0, 20) || `Гравець ${room.players.length + 1}`;
+      p = { id: crypto.randomUUID(), key: crypto.randomBytes(16).toString('hex'), name: clean,
         score: 0,
         socketId: socket.id,
         connected: true,
@@ -695,7 +692,7 @@ io.on("connection", socket => {
     socket.data.playerId = p.id;
     socket.data.roomCode = room.code;
     socket.join(room.code);
-    cb({ ok: true, playerId: p.id, code: room.code, name: p.name, state: publicState(room) });
+    cb({ ok: true, playerId: p.id, playerKey: p.key, code: room.code, name: p.name, state: publicState(room) });
     if (reconnectingExistingPlayer && room.phase !== "lobby") {
       // Refreshing a player phone must not reset HOST/OBS/video on the rest of the room.
       emitPlayerPresence(room, p);
