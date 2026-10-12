@@ -1,272 +1,852 @@
-<!doctype html><html lang="uk"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Ведучий — Своя гра</title><link rel="stylesheet" href="/style.css?v=307"><script src="/socket.io/socket.io.js"></script><script src="/common.js?v=307"></script><style>
-.menuHero{display:flex;justify-content:space-between;align-items:center;margin-bottom:18px}
-.gameMenu{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:16px}
-.gameCard{appearance:none;text-align:left;border:1px solid #493b70;background:#171128;color:white;border-radius:18px;padding:20px;cursor:pointer;display:grid;grid-template-columns:auto 1fr auto;gap:14px;align-items:center}
-.gameCard:hover{outline:2px solid var(--accent2)}
-.gameIcon{font-size:40px}.gameCard h2{margin:0 0 6px}.gameCard p{margin:0}.gamePlay{font-weight:900;color:#d7c8ff}
-.scorebar .player.voice-speaking{border-color:#a879ff!important;box-shadow:0 0 0 2px #9b69ff,0 0 18px #9560ff!important;background:#38215f!important}
-.scorebar .player.active.voice-speaking{background:linear-gradient(150deg,#665027,#453618)!important;color:#fff!important;box-shadow:0 0 0 2px #9b69ff,0 0 18px #9560ff!important}
-.cueMixer{display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:center;margin:8px auto 14px;padding:10px 14px;border:1px solid #493b70;border-radius:12px;background:#201733;max-width:680px}.cueMixer label{display:flex;align-items:center;gap:9px;font-weight:700}.cueMixer input{width:125px;padding:0;border:0;accent-color:#9862fa}.cueMixer output{min-width:3ch;text-align:right;font-variant-numeric:tabular-nums}
-</style>
-<style>
-.imageRevealWrap{width:min(100%,620px);max-width:620px;margin:12px auto;text-align:center}
-.imageRevealFrame{overflow:hidden;border-radius:18px;border:2px solid rgba(255,255,255,.18);background:#090514;box-shadow:0 16px 50px rgba(0,0,0,.42)}
-.imageRevealImg{display:block;width:100%;max-height:38vh;object-fit:contain;object-position:center center;transform-origin:center center;transition:filter .65s ease,transform .65s ease}
-.imageRevealValue{display:inline-block;margin:0 0 12px;padding:8px 18px;border-radius:999px;font-weight:900;font-size:clamp(24px,3vw,42px);background:rgba(255,196,0,.14);border:1px solid rgba(255,215,70,.45)}
-.emojiQuestion{font-size:clamp(56px,8vw,104px);line-height:1.25;text-align:center;letter-spacing:.12em;padding:18px 10px 30px;white-space:normal}
-</style>
-</head><body><div id="netBadge" style="position:fixed;right:14px;bottom:14px;z-index:9999;padding:8px 12px;border-radius:999px;background:#201833;border:1px solid #4d3d73;font-weight:800">🟡 Підключення…</div><div class="wrap"><div class="top"><div><div class="brand">SMOKERLOL • HOST</div><h1>СВОЯ ГРА — КІНОХАРДКОР</h1></div><div id="roomBox"></div></div><div class="cueMixer" aria-label="Гучність звукових сигналів"><label for="gongVolume">🔔 Гонг <input id="gongVolume" type="range" min="0" max="100" step="1" value="35" aria-label="Гучність гонга"><output id="gongVolumeValue" for="gongVolume">35%</output></label><label for="buzzVolume">✨ Відкрити BUZZ <input id="buzzVolume" type="range" min="0" max="100" step="1" value="35" aria-label="Гучність відкриття BUZZ"><output id="buzzVolumeValue" for="buzzVolume">35%</output></label></div><div id="app" class="panel"><button id="create" class="btn">Створити онлайн-кімнату</button></div></div><script>
-const socket=io();
-const cueAudio={
- question:new Audio('/sounds/question.mp3'),
- buzz_open:new Audio('/sounds/buzz.mp3')
-};
-Object.values(cueAudio).forEach(a=>{a.preload='auto';});
-function setupCueMixer(){
- const settings=[['gongVolume','question'],['buzzVolume','buzz_open']];
- // Each signal has its own persisted volume; media-question volume is independent.
- for(const [id,key] of settings){
-  const input=document.getElementById(id),out=document.getElementById(id+'Value');
-  const stored=localStorage.getItem('sgCueVolume_'+key);
-  const initial=stored===null?35:Number(stored);
-  input.value=String(Number.isFinite(initial)?Math.max(0,Math.min(100,initial)):35);
-  const update=()=>{const v=Number(input.value);cueAudio[key].volume=v/100;out.textContent=v+'%';localStorage.setItem('sgCueVolume_'+key,String(v));};
-  input.addEventListener('input',update);update();
- }
-}
-setupCueMixer();
+<!doctype html>
+<html lang="uk">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Ведучий — Своя гра</title>
+    <link rel="stylesheet" href="/style.css?v=307" />
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="/common.js?v=307"></script>
+    <style>
+      .menuHero {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 18px;
+      }
+      .gameMenu {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+        gap: 16px;
+      }
+      .gameCard {
+        appearance: none;
+        text-align: left;
+        border: 1px solid #493b70;
+        background: #171128;
+        color: white;
+        border-radius: 18px;
+        padding: 20px;
+        cursor: pointer;
+        display: grid;
+        grid-template-columns: auto 1fr auto;
+        gap: 14px;
+        align-items: center;
+      }
+      .gameCard:hover {
+        outline: 2px solid var(--accent2);
+      }
+      .gameIcon {
+        font-size: 40px;
+      }
+      .gameCard h2 {
+        margin: 0 0 6px;
+      }
+      .gameCard p {
+        margin: 0;
+      }
+      .gamePlay {
+        font-weight: 900;
+        color: #d7c8ff;
+      }
+      .scorebar .player.voice-speaking {
+        border-color: #a879ff !important;
+        box-shadow:
+          0 0 0 2px #9b69ff,
+          0 0 18px #9560ff !important;
+        background: #38215f !important;
+      }
+      .scorebar .player.active.voice-speaking {
+        background: linear-gradient(150deg, #665027, #453618) !important;
+        color: #fff !important;
+        box-shadow:
+          0 0 0 2px #9b69ff,
+          0 0 18px #9560ff !important;
+      }
+      .cueMixer {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px;
+        align-items: center;
+        justify-content: center;
+        margin: 8px auto 14px;
+        padding: 10px 14px;
+        border: 1px solid #493b70;
+        border-radius: 12px;
+        background: #201733;
+        max-width: 680px;
+      }
+      .cueMixer label {
+        display: flex;
+        align-items: center;
+        gap: 9px;
+        font-weight: 700;
+      }
+      .cueMixer input {
+        width: 125px;
+        padding: 0;
+        border: 0;
+        accent-color: #9862fa;
+      }
+      .cueMixer output {
+        min-width: 3ch;
+        text-align: right;
+        font-variant-numeric: tabular-nums;
+      }
+    </style>
+    <style>
+      .imageRevealWrap {
+        width: min(100%, 620px);
+        max-width: 620px;
+        margin: 12px auto;
+        text-align: center;
+      }
+      .imageRevealFrame {
+        overflow: hidden;
+        border-radius: 18px;
+        border: 2px solid rgba(255, 255, 255, 0.18);
+        background: #090514;
+        box-shadow: 0 16px 50px rgba(0, 0, 0, 0.42);
+      }
+      .imageRevealImg {
+        display: block;
+        width: 100%;
+        max-height: 38vh;
+        object-fit: contain;
+        object-position: center center;
+        transform-origin: center center;
+        transition:
+          filter 0.65s ease,
+          transform 0.65s ease;
+      }
+      .imageRevealValue {
+        display: inline-block;
+        margin: 0 0 12px;
+        padding: 8px 18px;
+        border-radius: 999px;
+        font-weight: 900;
+        font-size: clamp(24px, 3vw, 42px);
+        background: rgba(255, 196, 0, 0.14);
+        border: 1px solid rgba(255, 215, 70, 0.45);
+      }
+      .emojiQuestion {
+        font-size: clamp(56px, 8vw, 104px);
+        line-height: 1.25;
+        text-align: center;
+        letter-spacing: 0.12em;
+        padding: 18px 10px 30px;
+        white-space: normal;
+      }
+    </style>
+  </head>
+  <body>
+    <div
+      id="netBadge"
+      style="
+        position: fixed;
+        right: 14px;
+        bottom: 14px;
+        z-index: 9999;
+        padding: 8px 12px;
+        border-radius: 999px;
+        background: #201833;
+        border: 1px solid #4d3d73;
+        font-weight: 800;
+      "
+    >
+      🟡 Підключення…
+    </div>
+    <div class="wrap">
+      <div class="top">
+        <div>
+          <div class="brand">SMOKERLOL • HOST</div>
+          <h1>СВОЯ ГРА — КІНОХАРДКОР</h1>
+        </div>
+        <div id="roomBox"></div>
+      </div>
+      <div class="cueMixer" aria-label="Гучність звукових сигналів">
+        <label for="gongVolume"
+          >🔔 Гонг
+          <input
+            id="gongVolume"
+            type="range"
+            min="0"
+            max="100"
+            step="1"
+            value="35"
+            aria-label="Гучність гонга"
+          /><output id="gongVolumeValue" for="gongVolume">35%</output></label
+        ><label for="buzzVolume"
+          >✨ Відкрити BUZZ
+          <input
+            id="buzzVolume"
+            type="range"
+            min="0"
+            max="100"
+            step="1"
+            value="35"
+            aria-label="Гучність відкриття BUZZ"
+          /><output id="buzzVolumeValue" for="buzzVolume">35%</output></label
+        >
+      </div>
+      <div id="app" class="panel"><button id="create" class="btn">Створити онлайн-кімнату</button></div>
+    </div>
+    <script>
+      const socket = io();
+      const cueAudio = {
+        question: new Audio("/sounds/question.mp3"),
+        buzz_open: new Audio("/sounds/buzz.mp3"),
+      };
+      Object.values(cueAudio).forEach(a => {
+        a.preload = "auto";
+      });
+      function setupCueMixer() {
+        const settings = [
+          ["gongVolume", "question"],
+          ["buzzVolume", "buzz_open"],
+        ];
+        // Each signal has its own persisted volume; media-question volume is independent.
+        for (const [id, key] of settings) {
+          const input = document.getElementById(id),
+            out = document.getElementById(id + "Value");
+          const stored = localStorage.getItem("sgCueVolume_" + key);
+          const initial = stored === null ? 35 : Number(stored);
+          input.value = String(Number.isFinite(initial) ? Math.max(0, Math.min(100, initial)) : 35);
+          const update = () => {
+            const v = Number(input.value);
+            cueAudio[key].volume = v / 100;
+            out.textContent = v + "%";
+            localStorage.setItem("sgCueVolume_" + key, String(v));
+          };
+          input.addEventListener("input", update);
+          update();
+        }
+      }
+      setupCueMixer();
 
-function playCueSound(type){
- const key=type==='gong'?'question':type;
- const a=cueAudio[key];
- if(!a)return;
- try{
-  a.pause();
-  a.currentTime=0;
-  const p=a.play();
-  if(p&&p.catch)p.catch(()=>{});
- }catch(e){}
-}
-const hostFinalMusic={
- results_theme:new Audio('/media/results_theme.mp3'),
- winner_theme:new Audio('/media/winner_theme.mp3')
-};
-Object.values(hostFinalMusic).forEach(a=>{a.preload='auto';a.volume=0.35;});
-function setHostFinalVolume(v){
- const volume=Math.max(0,Math.min(100,Number(v)||0));
- localStorage.setItem('sgFinalMusicVolume',String(volume));
- Object.values(hostFinalMusic).forEach(a=>a.volume=volume/100);
- const out=document.getElementById('finalMusicVolumeValue');
- if(out)out.textContent=volume+'%';
-}
-setHostFinalVolume(localStorage.getItem('sgFinalMusicVolume')??35);
-function playHostFinalMusic(type){
- if(!['results_theme','winner_theme','final_music_stop'].includes(type))return false;
- for(const a of Object.values(hostFinalMusic)){a.pause();a.currentTime=0;}
- if(type!=='final_music_stop'){
-  const p=hostFinalMusic[type].play();
-  if(p&&p.catch)p.catch(err=>console.warn('Host final music playback blocked:',err));
- }
- return true;
-}
-const hostMurlocAudio=new Audio('/media/murloc.mp3');hostMurlocAudio.preload='auto';
-socket.on('cue',e=>{if(e?.type==='murloc_answer'){hostMurlocAudio.pause();hostMurlocAudio.currentTime=0;hostMurlocAudio.play().catch(err=>console.warn('Host Murloc audio:',err));return;}if(!playHostFinalMusic(e?.type))playCueSound(e?.type);});
- let voiceMappings={},voiceTestIds=[],voicePanelOpen=false,voiceDraftIds={},voiceBotStatus='unknown',voiceBotError='';
-let state=null,data=null,gamesList=[],seasonAdminToken='',selectedGameId='',hostSpecialCells={},code='',hostToken=localStorage.getItem('sgHostToken')||'',storedCode=localStorage.getItem('sgRoomCode')||'',hostAudienceWinner=null;
-function setNetBadge(ok){
- const el=document.getElementById('netBadge');if(!el)return;
- el.textContent=ok?'🟢 Сервер підключено':'🔴 З’єднання втрачено';
-}
-function restoreHostConnection(){
- if(!code||!hostToken)return;
- socket.emit('rejoinHost',{code,hostToken},async r=>{
-   if(!r?.ok)return;
-   state=r.state;selectedGameId=r.gameId||state.gameId;hostSpecialCells=r.specialCells||{};voiceMappings=r.voiceMappings||{};
-   try{if(!data||selectedGameId!==state.gameId)await loadGameData(selectedGameId)}catch(e){console.error(e)}
-   renderRoom();if(data)render();
- });
-}
-socket.on('connect',()=>{setNetBadge(true);if(code&&hostToken)restoreHostConnection()});
-socket.on('disconnect',()=>setNetBadge(false));
+      function playCueSound(type) {
+        const key = type === "gong" ? "question" : type;
+        const a = cueAudio[key];
+        if (!a) return;
+        try {
+          a.pause();
+          a.currentTime = 0;
+          const p = a.play();
+          if (p && p.catch) p.catch(() => {});
+        } catch (e) {}
+      }
+      const hostFinalMusic = {
+        results_theme: new Audio("/media/results_theme.mp3"),
+        winner_theme: new Audio("/media/winner_theme.mp3"),
+      };
+      Object.values(hostFinalMusic).forEach(a => {
+        a.preload = "auto";
+        a.volume = 0.35;
+      });
+      function setHostFinalVolume(v) {
+        const volume = Math.max(0, Math.min(100, Number(v) || 0));
+        localStorage.setItem("sgFinalMusicVolume", String(volume));
+        Object.values(hostFinalMusic).forEach(a => (a.volume = volume / 100));
+        const out = document.getElementById("finalMusicVolumeValue");
+        if (out) out.textContent = volume + "%";
+      }
+      setHostFinalVolume(localStorage.getItem("sgFinalMusicVolume") ?? 35);
+      function playHostFinalMusic(type) {
+        if (!["results_theme", "winner_theme", "final_music_stop"].includes(type)) return false;
+        for (const a of Object.values(hostFinalMusic)) {
+          a.pause();
+          a.currentTime = 0;
+        }
+        if (type !== "final_music_stop") {
+          const p = hostFinalMusic[type].play();
+          if (p && p.catch) p.catch(err => console.warn("Host final music playback blocked:", err));
+        }
+        return true;
+      }
+      const hostMurlocAudio = new Audio("/media/murloc.mp3");
+      hostMurlocAudio.preload = "auto";
+      socket.on("cue", e => {
+        if (e?.type === "murloc_answer") {
+          hostMurlocAudio.pause();
+          hostMurlocAudio.currentTime = 0;
+          hostMurlocAudio.play().catch(err => console.warn("Host Murloc audio:", err));
+          return;
+        }
+        if (!playHostFinalMusic(e?.type)) playCueSound(e?.type);
+      });
+      let voiceMappings = {},
+        voiceTestIds = [],
+        voicePanelOpen = false,
+        voiceDraftIds = {},
+        voiceBotStatus = "unknown",
+        voiceBotError = "";
+      let state = null,
+        data = null,
+        gamesList = [],
+        seasonAdminToken = "",
+        selectedGameId = "",
+        hostSpecialCells = {},
+        code = "",
+        hostToken = localStorage.getItem("sgHostToken") || "",
+        storedCode = localStorage.getItem("sgRoomCode") || "",
+        hostAudienceWinner = null;
+      function setNetBadge(ok) {
+        const el = document.getElementById("netBadge");
+        if (!el) return;
+        el.textContent = ok ? "🟢 Сервер підключено" : "🔴 З’єднання втрачено";
+      }
+      function restoreHostConnection() {
+        if (!code || !hostToken) return;
+        socket.emit("rejoinHost", { code, hostToken }, async r => {
+          if (!r?.ok) return;
+          state = r.state;
+          selectedGameId = r.gameId || state.gameId;
+          hostSpecialCells = r.specialCells || {};
+          voiceMappings = r.voiceMappings || {};
+          try {
+            if (!data || selectedGameId !== state.gameId) await loadGameData(selectedGameId);
+          } catch (e) {
+            console.error(e);
+          }
+          renderRoom();
+          if (data) render();
+        });
+      }
+      socket.on("connect", () => {
+        setNetBadge(true);
+        if (code && hostToken) restoreHostConnection();
+      });
+      socket.on("disconnect", () => setNetBadge(false));
 
+      let firstTurnClockHandle = null;
+      function armFirstTurnClock() {
+        if (firstTurnClockHandle) {
+          clearInterval(firstTurnClockHandle);
+          firstTurnClockHandle = null;
+        }
+        const el = document.getElementById("firstTurnTimer");
+        const remaining = Number(state?.firstTurnQuiz?.remainingMs || 0);
+        if (!el || remaining <= 0 || state?.firstTurnQuiz?.timerStatus !== "running") return;
+        const end = Date.now() + remaining;
+        const tick = () => {
+          const left = Math.max(0, Math.ceil((end - Date.now()) / 1000));
+          el.textContent = String(left);
+          if (left <= 0 && firstTurnClockHandle) {
+            clearInterval(firstTurnClockHandle);
+            firstTurnClockHandle = null;
+          }
+        };
+        tick();
+        firstTurnClockHandle = setInterval(tick, 200);
+      }
 
-let firstTurnClockHandle=null;
-function armFirstTurnClock(){
-  if(firstTurnClockHandle){clearInterval(firstTurnClockHandle);firstTurnClockHandle=null}
-  const el=document.getElementById('firstTurnTimer');
-  const remaining=Number(state?.firstTurnQuiz?.remainingMs||0);
-  if(!el||remaining<=0||state?.firstTurnQuiz?.timerStatus!=='running')return;
-  const end=Date.now()+remaining;
-  const tick=()=>{
-    const left=Math.max(0,Math.ceil((end-Date.now())/1000));
-    el.textContent=String(left);
-    if(left<=0&&firstTurnClockHandle){clearInterval(firstTurnClockHandle);firstTurnClockHandle=null}
-  };
-  tick();
-  firstTurnClockHandle=setInterval(tick,200);
-}
-
-async function loadGameData(gameId){
- const r=await fetch(`/games/${encodeURIComponent(gameId)}.json`,{cache:'no-store'});
- if(!r.ok) throw new Error('Game HTTP '+r.status);
- data=await r.json();
-}
-async function init(){
- try{
-  const gr=await fetch('/games',{cache:'no-store'});
-  if(!gr.ok) throw new Error('Games HTTP '+gr.status);
-  gamesList=await gr.json();
-  if(storedCode&&hostToken){
-   socket.emit('rejoinHost',{code:storedCode,hostToken},async r=>{
-    if(r.ok){
-      code=r.code; state=r.state; selectedGameId=r.gameId||state.gameId; hostSpecialCells=r.specialCells||{};
-      await loadGameData(selectedGameId); renderRoom(); render();
-    } else {
-      localStorage.removeItem('sgHostToken'); localStorage.removeItem('sgRoomCode');
-      hostToken=''; storedCode=''; renderStart();
-    }
-   });
-  } else renderStart();
- }catch(e){
-  roomBox.innerHTML='';
-  app.innerHTML='<h2>Помилка завантаження меню</h2><p class="muted">Не вдалося завантажити список ігор. Оновіть сторінку.</p>';
-  console.error(e);
- }
-}
-init();
-const app=document.getElementById('app'), roomBox=document.getElementById('roomBox');
-function renderStart(){
- roomBox.innerHTML='';
- const cards=gamesList.map(g=>`<button class="gameCard" data-game="${GameUI.esc(g.id)}"><div class="gameIcon">${GameUI.esc(g.icon||'🎮')}</div><div><h2>${GameUI.esc(g.title)}</h2><p class="muted">${GameUI.esc(g.description||'')}</p></div><div class="gamePlay">Грати →</div></button>`).join('');
- app.innerHTML=`<div class="menuHero"><div><h2>🎮 Оберіть гру</h2><p class="muted">Створіть кімнату з потрібним набором категорій і запитань.</p></div></div>
- <div class="gameMenu">${cards||'<p>Немає доступних ігор.</p>'}</div>
+      async function loadGameData(gameId) {
+        const r = await fetch(`/games/${encodeURIComponent(gameId)}.json`, { cache: "no-store" });
+        if (!r.ok) throw new Error("Game HTTP " + r.status);
+        data = await r.json();
+      }
+      async function init() {
+        try {
+          const gr = await fetch("/games", { cache: "no-store" });
+          if (!gr.ok) throw new Error("Games HTTP " + gr.status);
+          gamesList = await gr.json();
+          if (storedCode && hostToken) {
+            socket.emit("rejoinHost", { code: storedCode, hostToken }, async r => {
+              if (r.ok) {
+                code = r.code;
+                state = r.state;
+                selectedGameId = r.gameId || state.gameId;
+                hostSpecialCells = r.specialCells || {};
+                await loadGameData(selectedGameId);
+                renderRoom();
+                render();
+              } else {
+                localStorage.removeItem("sgHostToken");
+                localStorage.removeItem("sgRoomCode");
+                hostToken = "";
+                storedCode = "";
+                renderStart();
+              }
+            });
+          } else renderStart();
+        } catch (e) {
+          roomBox.innerHTML = "";
+          app.innerHTML =
+            '<h2>Помилка завантаження меню</h2><p class="muted">Не вдалося завантажити список ігор. Оновіть сторінку.</p>';
+          console.error(e);
+        }
+      }
+      init();
+      const app = document.getElementById("app"),
+        roomBox = document.getElementById("roomBox");
+      function renderStart() {
+        roomBox.innerHTML = "";
+        const cards = gamesList
+          .map(
+            g =>
+              `<button class="gameCard" data-game="${GameUI.esc(g.id)}"><div class="gameIcon">${GameUI.esc(g.icon || "🎮")}</div><div><h2>${GameUI.esc(g.title)}</h2><p class="muted">${GameUI.esc(g.description || "")}</p></div><div class="gamePlay">Грати →</div></button>`,
+          )
+          .join("");
+        app.innerHTML = `<div class="menuHero"><div><h2>🎮 Оберіть гру</h2><p class="muted">Створіть кімнату з потрібним набором категорій і запитань.</p></div></div>
+ <div class="gameMenu">${cards || "<p>Немає доступних ігор.</p>"}</div>
  <div class="panel" style="margin-top:22px"><h2 style="margin-top:0">🏆 Керування сезонами</h2><div id="startSeasonAdmin"><p class="muted">Завантаження сезонів…</p></div></div>
  <div class="row" style="margin-top:20px"><a class="btn gold" href="/seasons" target="_blank">🏆 Публічні сезони та результати</a></div>`;
- document.querySelectorAll('.gameCard').forEach(b=>b.onclick=()=>createRoom(b.dataset.game));
- loadStartSeasonAdmin();
-}
+        document.querySelectorAll(".gameCard").forEach(b => (b.onclick = () => createRoom(b.dataset.game)));
+        loadStartSeasonAdmin();
+      }
 
-function seasonPointsWordStart(n){n=Math.abs(Number(n)||0)%100;const n10=n%10;if(n>10&&n<20)return 'балів';if(n10===1)return 'бал';if(n10>=2&&n10<=4)return 'бали';return 'балів'}
-function loadStartSeasonAdmin(){
- const area=document.getElementById('startSeasonAdmin');if(!area)return;
- socket.emit('seasonAdminInit',{},r=>{
-   if(!r?.ok){area.innerHTML=`<p>${GameUI.esc(r?.error||'Помилка')}</p>`;return}
-   seasonAdminToken=r.adminToken||seasonAdminToken;
-   fetch('/api/seasons',{cache:'no-store'}).then(x=>x.json()).then(payload=>{
-     const detailed=payload.seasons||[],active=detailed.find(s=>s.status==='active'),completed=detailed.filter(s=>s.status==='completed');
-     const activeHtml=active?`<div style="padding:14px;border:1px solid #6e53a8;border-radius:14px"><div class="top"><div><h3 style="margin:0">🟢 ${GameUI.esc(active.name)}</h3><div class="muted">${active.games.length} ігор • ${active.leaderboard.length} гравців</div></div><button class="btn bad startFinishSeason" data-id="${active.id}" data-name="${GameUI.esc(active.name)}">🏁 Завершити сезон</button></div>${active.leaderboard.length?`<div class="muted" style="margin-top:10px">Лідер: <b>${GameUI.esc(active.leaderboard[0].name)}</b> — ${active.leaderboard[0].seasonPoints} ${seasonPointsWordStart(active.leaderboard[0].seasonPoints)}</div>`:''}</div>`:`<div class="center"><h3>Немає активного сезону</h3><p class="muted">Створіть наступний сезон для нових ігор.</p></div>`;
-     const archiveHtml=completed.length?`<div style="margin-top:16px"><h3>📚 Архів сезонів</h3>${completed.map(s=>`<div class="finalItem"><span><b>${GameUI.esc(s.name)}</b>${s.champion?` • 🏆 ${GameUI.esc(s.champion.name)}`:''}<div class="muted">${s.games.length} ігор</div></span><button class="btn secondary startReopenSeason" data-id="${s.id}">↩ Відновити</button></div>`).join('')}</div>`:'';
-     const createHtml=!active?`<div class="row" style="margin-top:16px"><input id="startNewSeasonName" value="Сезон ${detailed.length+1}" style="max-width:260px"><button class="btn gold" id="startCreateSeason">➕ Створити наступний сезон</button></div>`:'';
-     area.innerHTML=activeHtml+createHtml+archiveHtml;
-     area.querySelectorAll('.startFinishSeason').forEach(b=>b.onclick=()=>{if(!confirm(`Завершити «${b.dataset.name}»? Сезон перейде в архів, а лідер стане чемпіоном.`))return;socket.emit('seasonAdminSetStatus',{adminToken:seasonAdminToken,seasonId:b.dataset.id,status:'completed'},x=>{if(!x?.ok)alert(x?.error||'Помилка');else loadStartSeasonAdmin()})});
-     area.querySelectorAll('.startReopenSeason').forEach(b=>b.onclick=()=>{if(!confirm('Відновити цей сезон як активний?'))return;socket.emit('seasonAdminSetStatus',{adminToken:seasonAdminToken,seasonId:b.dataset.id,status:'active'},x=>{if(!x?.ok)alert(x?.error||'Помилка');else loadStartSeasonAdmin()})});
-     const create=document.getElementById('startCreateSeason');if(create)create.onclick=()=>{const name=document.getElementById('startNewSeasonName').value.trim();if(!name)return alert('Вкажіть назву сезону.');socket.emit('seasonAdminCreate',{adminToken:seasonAdminToken,name},x=>{if(!x?.ok)alert(x?.error||'Помилка');else loadStartSeasonAdmin()})};
-   }).catch(()=>{area.innerHTML='<p>Не вдалося завантажити деталі сезонів.</p>'});
- });
-}
+      function seasonPointsWordStart(n) {
+        n = Math.abs(Number(n) || 0) % 100;
+        const n10 = n % 10;
+        if (n > 10 && n < 20) return "балів";
+        if (n10 === 1) return "бал";
+        if (n10 >= 2 && n10 <= 4) return "бали";
+        return "балів";
+      }
+      function loadStartSeasonAdmin() {
+        const area = document.getElementById("startSeasonAdmin");
+        if (!area) return;
+        socket.emit("seasonAdminInit", {}, r => {
+          if (!r?.ok) {
+            area.innerHTML = `<p>${GameUI.esc(r?.error || "Помилка")}</p>`;
+            return;
+          }
+          seasonAdminToken = r.adminToken || seasonAdminToken;
+          fetch("/api/seasons", { cache: "no-store" })
+            .then(x => x.json())
+            .then(payload => {
+              const detailed = payload.seasons || [],
+                active = detailed.find(s => s.status === "active"),
+                completed = detailed.filter(s => s.status === "completed");
+              const activeHtml = active
+                ? `<div style="padding:14px;border:1px solid #6e53a8;border-radius:14px"><div class="top"><div><h3 style="margin:0">🟢 ${GameUI.esc(active.name)}</h3><div class="muted">${active.games.length} ігор • ${active.leaderboard.length} гравців</div></div><button class="btn bad startFinishSeason" data-id="${active.id}" data-name="${GameUI.esc(active.name)}">🏁 Завершити сезон</button></div>${active.leaderboard.length ? `<div class="muted" style="margin-top:10px">Лідер: <b>${GameUI.esc(active.leaderboard[0].name)}</b> — ${active.leaderboard[0].seasonPoints} ${seasonPointsWordStart(active.leaderboard[0].seasonPoints)}</div>` : ""}</div>`
+                : `<div class="center"><h3>Немає активного сезону</h3><p class="muted">Створіть наступний сезон для нових ігор.</p></div>`;
+              const archiveHtml = completed.length
+                ? `<div style="margin-top:16px"><h3>📚 Архів сезонів</h3>${completed.map(s => `<div class="finalItem"><span><b>${GameUI.esc(s.name)}</b>${s.champion ? ` • 🏆 ${GameUI.esc(s.champion.name)}` : ""}<div class="muted">${s.games.length} ігор</div></span><button class="btn secondary startReopenSeason" data-id="${s.id}">↩ Відновити</button></div>`).join("")}</div>`
+                : "";
+              const createHtml = !active
+                ? `<div class="row" style="margin-top:16px"><input id="startNewSeasonName" value="Сезон ${detailed.length + 1}" style="max-width:260px"><button class="btn gold" id="startCreateSeason">➕ Створити наступний сезон</button></div>`
+                : "";
+              area.innerHTML = activeHtml + createHtml + archiveHtml;
+              area.querySelectorAll(".startFinishSeason").forEach(
+                b =>
+                  (b.onclick = () => {
+                    if (!confirm(`Завершити «${b.dataset.name}»? Сезон перейде в архів, а лідер стане чемпіоном.`))
+                      return;
+                    socket.emit(
+                      "seasonAdminSetStatus",
+                      { adminToken: seasonAdminToken, seasonId: b.dataset.id, status: "completed" },
+                      x => {
+                        if (!x?.ok) alert(x?.error || "Помилка");
+                        else loadStartSeasonAdmin();
+                      },
+                    );
+                  }),
+              );
+              area.querySelectorAll(".startReopenSeason").forEach(
+                b =>
+                  (b.onclick = () => {
+                    if (!confirm("Відновити цей сезон як активний?")) return;
+                    socket.emit(
+                      "seasonAdminSetStatus",
+                      { adminToken: seasonAdminToken, seasonId: b.dataset.id, status: "active" },
+                      x => {
+                        if (!x?.ok) alert(x?.error || "Помилка");
+                        else loadStartSeasonAdmin();
+                      },
+                    );
+                  }),
+              );
+              const create = document.getElementById("startCreateSeason");
+              if (create)
+                create.onclick = () => {
+                  const name = document.getElementById("startNewSeasonName").value.trim();
+                  if (!name) return alert("Вкажіть назву сезону.");
+                  socket.emit("seasonAdminCreate", { adminToken: seasonAdminToken, name }, x => {
+                    if (!x?.ok) alert(x?.error || "Помилка");
+                    else loadStartSeasonAdmin();
+                  });
+                };
+            })
+            .catch(() => {
+              area.innerHTML = "<p>Не вдалося завантажити деталі сезонів.</p>";
+            });
+        });
+      }
 
-async function createRoom(gameId){
- selectedGameId=gameId;
- await loadGameData(gameId);
- socket.emit('createRoom',{hostToken:crypto.randomUUID(),gameId},r=>{
-   if(!r.ok){alert(r.error||'Не вдалося створити кімнату');return}
-   code=r.code;hostToken=r.hostToken;state=r.state||state;hostSpecialCells=r.specialCells||{};
-   localStorage.setItem('sgHostToken',hostToken);localStorage.setItem('sgRoomCode',code);
-   renderRoom();render();
- });
-}
-function renderRoom(){roomBox.innerHTML=`<div class="badge">Кімната <b>${code}</b></div>`}
-socket.on('state',async s=>{if(code&&s.code!==code)return;const prevPhase=state?.phase;state=s;code=s.code;if(s.gameId&&s.gameId!==selectedGameId){selectedGameId=s.gameId;await loadGameData(selectedGameId)}renderRoom();if(data)render();if(prevPhase!=='answering'&&s.phase==='answering'){const media=document.querySelector('video.quizVideo,audio.quizAudio');if(media&&!media.paused)media.pause();}});
-socket.on('hostSecrets',s=>{if(code&&s.code!==code)return;hostSpecialCells=s.specialCells||{};voiceMappings=s.voiceMappings||{};hostAudienceWinner=s.audienceWinner||null;if(data&&state&&['lobby','board'].includes(state.phase))render()});
-socket.on('voiceMappings',x=>{if(x.code!==code)return;voiceMappings=x.mappings||{};if(!['question','buzz','answering','result','video_result'].includes(state?.phase))render()});
-socket.on('voiceSpeaking',x=>{if(!state||x.code!==code)return;state.voice={...(state.voice||{}),speakingPlayerIds:x.playerIds||[]};document.querySelectorAll('.scorebar .player[data-player-id]').forEach(el=>el.classList.toggle('voice-speaking',x.playerIds?.includes(el.dataset.playerId)));});
-socket.on('voiceBotStatus',x=>{if(!state||x.code!==code)return;voiceBotStatus=x.status||'unknown';voiceBotError=x.error||'';if(!['question','buzz','answering','result','video_result'].includes(state?.phase))render()});
-socket.on('firstTurnProgress',x=>{if(!state||x.code!==code||state.phase!=='first_turn_quiz')return;state.firstTurnQuiz.submittedPlayerIds=x.submittedPlayerIds||[];if(Number.isFinite(Number(x.remainingMs)))state.firstTurnQuiz.remainingMs=Number(x.remainingMs);if(x.timerStatus)state.firstTurnQuiz.timerStatus=x.timerStatus;render()});
-socket.on('audienceProgress',x=>{if(!state||x.code!==code||!state.audience)return;state.audience.joined=Number(x.joined||0);state.audience.submitted=Number(x.submitted||0);if(Number.isFinite(Number(x.remainingMs)))state.audience.remainingMs=Number(x.remainingMs);const joined=document.getElementById('audienceJoined');if(joined)joined.textContent=String(state.audience.joined);const submitted=document.getElementById('audienceSubmitted');if(submitted)submitted.textContent=`${state.audience.submitted}/${state.audience.joined}`;if(state.phase==='audience_lobby'){const start=document.getElementById('startAudienceQuestion');if(start)start.disabled=state.audience.joined<1;const waiting=document.getElementById('audienceWaiting');if(waiting)waiting.hidden=state.audience.joined>=1;}});
-function updatePlayerNetwork(playerId){
- const p=state?.players?.find(p=>p.id===playerId);if(!p)return;
- const rtt=Number.isFinite(Number(p.networkRttMs))?Math.round(Number(p.networkRttMs)):null;
- const jitter=Number.isFinite(Number(p.networkJitterMs))?Math.round(Number(p.networkJitterMs)):null;
- const ready=!p.connected?'🔴 LOST':p.syncReady?'🟢 READY':'🟡 SYNC…';
- const net=rtt==null?'⚪ ping —':(rtt<80?'🟢':rtt<160?'🟡':'🔴')+' '+rtt+' ms'+(jitter==null?'':' • jitter '+jitter+' ms');
- document.querySelectorAll('.player[data-player-id]').forEach(el=>{
-   if(el.dataset.playerId===String(playerId)){const label=el.querySelector('.player-network');if(label)label.textContent=ready+' • '+net;}
- });
-}
-socket.on('networkStats',x=>{if(!state||x.code!==code)return;const p=state.players?.find(p=>p.id===x.playerId);if(p){p.networkRttMs=x.rttMs;p.networkJitterMs=x.jitterMs;p.syncReady=x.syncReady;updatePlayerNetwork(x.playerId);}});
-socket.on('playerPresence',x=>{if(!state||x.code!==code)return;const p=state.players?.find(p=>p.id===x.playerId);if(!p)return;p.connected=!!x.connected;p.syncReady=!!x.syncReady;updatePlayerNetwork(x.playerId);});
-socket.on('roomClosed',x=>{if(x.code!==code)return;localStorage.removeItem('sgHostToken');localStorage.removeItem('sgRoomCode');code='';hostToken='';state=null;data=null;selectedGameId='';hostSpecialCells={};renderStart()});
-function emit(ev,p={},cb=()=>{}){socket.emit(ev,{code,...p},cb)}
-function hostBoardHTML(){
- const r=data.rounds[state.round]; let h='<div class="grid">';
- r.categories.forEach(c=>h+=`<div class="cat">${GameUI.esc(c.name)}</div>`);
- for(let qi=0;qi<5;qi++){
-  r.categories.forEach((c,ci)=>{
-   const q=c.questions[qi], key=`${state.round}:${ci}:${qi}`, used=state.used[key],selected=state.selectedTile?.round===state.round&&state.selectedTile.ci===ci&&state.selectedTile.qi===qi;
-   const special=hostSpecialCells[key];
-   const mark=q.type==='triplet'?'🔥':special==='cat'?'🐈':special==='va_bank'?'🎰':special==='duel'?'⚔️':q.cat?'🐈':'';
-   const title=q.type==='triplet'?'ТРИПЛЕТ':special==='cat'?'Кіт у мішку':special==='va_bank'?'ВА-БАНК':special==='duel'?'ДУЕЛЬ':q.cat?'Кіт у мішку':'';
-   h+=`<button class="tile ${used?'used':''} ${selected?'tile-selecting':''}" data-ci="${ci}" data-qi="${qi}" ${(used||state.selectedTile)?'disabled':''} title="${title}"><span>${q.value}</span>${mark?` <span style="font-size:.55em;vertical-align:middle">${mark}</span>`:''}</button>`;
-  });
- }
- return h+'</div>';
-}
+      async function createRoom(gameId) {
+        selectedGameId = gameId;
+        await loadGameData(gameId);
+        socket.emit("createRoom", { hostToken: crypto.randomUUID(), gameId }, r => {
+          if (!r.ok) {
+            alert(r.error || "Не вдалося створити кімнату");
+            return;
+          }
+          code = r.code;
+          hostToken = r.hostToken;
+          state = r.state || state;
+          hostSpecialCells = r.specialCells || {};
+          localStorage.setItem("sgHostToken", hostToken);
+          localStorage.setItem("sgRoomCode", code);
+          renderRoom();
+          render();
+        });
+      }
+      function renderRoom() {
+        roomBox.innerHTML = `<div class="badge">Кімната <b>${code}</b></div>`;
+      }
+      socket.on("state", async s => {
+        if (code && s.code !== code) return;
+        const prevPhase = state?.phase;
+        state = s;
+        code = s.code;
+        if (s.gameId && s.gameId !== selectedGameId) {
+          selectedGameId = s.gameId;
+          await loadGameData(selectedGameId);
+        }
+        renderRoom();
+        if (data) render();
+        if (prevPhase !== "answering" && s.phase === "answering") {
+          const media = document.querySelector("video.quizVideo,audio.quizAudio");
+          if (media && !media.paused) media.pause();
+        }
+      });
+      socket.on("hostSecrets", s => {
+        if (code && s.code !== code) return;
+        hostSpecialCells = s.specialCells || {};
+        voiceMappings = s.voiceMappings || {};
+        hostAudienceWinner = s.audienceWinner || null;
+        if (data && state && ["lobby", "board"].includes(state.phase)) render();
+      });
+      socket.on("voiceMappings", x => {
+        if (x.code !== code) return;
+        voiceMappings = x.mappings || {};
+        if (!["question", "buzz", "answering", "result", "video_result"].includes(state?.phase)) render();
+      });
+      socket.on("voiceSpeaking", x => {
+        if (!state || x.code !== code) return;
+        state.voice = { ...(state.voice || {}), speakingPlayerIds: x.playerIds || [] };
+        document
+          .querySelectorAll(".scorebar .player[data-player-id]")
+          .forEach(el => el.classList.toggle("voice-speaking", x.playerIds?.includes(el.dataset.playerId)));
+      });
+      socket.on("voiceBotStatus", x => {
+        if (!state || x.code !== code) return;
+        voiceBotStatus = x.status || "unknown";
+        voiceBotError = x.error || "";
+        if (!["question", "buzz", "answering", "result", "video_result"].includes(state?.phase)) render();
+      });
+      socket.on("firstTurnProgress", x => {
+        if (!state || x.code !== code || state.phase !== "first_turn_quiz") return;
+        state.firstTurnQuiz.submittedPlayerIds = x.submittedPlayerIds || [];
+        if (Number.isFinite(Number(x.remainingMs))) state.firstTurnQuiz.remainingMs = Number(x.remainingMs);
+        if (x.timerStatus) state.firstTurnQuiz.timerStatus = x.timerStatus;
+        render();
+      });
+      socket.on("audienceProgress", x => {
+        if (!state || x.code !== code || !state.audience) return;
+        state.audience.joined = Number(x.joined || 0);
+        state.audience.submitted = Number(x.submitted || 0);
+        if (Number.isFinite(Number(x.remainingMs))) state.audience.remainingMs = Number(x.remainingMs);
+        const joined = document.getElementById("audienceJoined");
+        if (joined) joined.textContent = String(state.audience.joined);
+        const submitted = document.getElementById("audienceSubmitted");
+        if (submitted) submitted.textContent = `${state.audience.submitted}/${state.audience.joined}`;
+        if (state.phase === "audience_lobby") {
+          const start = document.getElementById("startAudienceQuestion");
+          if (start) start.disabled = state.audience.joined < 1;
+          const waiting = document.getElementById("audienceWaiting");
+          if (waiting) waiting.hidden = state.audience.joined >= 1;
+        }
+      });
+      function updatePlayerNetwork(playerId) {
+        const p = state?.players?.find(p => p.id === playerId);
+        if (!p) return;
+        const rtt = Number.isFinite(Number(p.networkRttMs)) ? Math.round(Number(p.networkRttMs)) : null;
+        const jitter = Number.isFinite(Number(p.networkJitterMs)) ? Math.round(Number(p.networkJitterMs)) : null;
+        const ready = !p.connected ? "🔴 LOST" : p.syncReady ? "🟢 READY" : "🟡 SYNC…";
+        const net =
+          rtt == null
+            ? "⚪ ping —"
+            : (rtt < 80 ? "🟢" : rtt < 160 ? "🟡" : "🔴")
+              + " "
+              + rtt
+              + " ms"
+              + (jitter == null ? "" : " • jitter " + jitter + " ms");
+        document.querySelectorAll(".player[data-player-id]").forEach(el => {
+          if (el.dataset.playerId === String(playerId)) {
+            const label = el.querySelector(".player-network");
+            if (label) label.textContent = ready + " • " + net;
+          }
+        });
+      }
+      socket.on("networkStats", x => {
+        if (!state || x.code !== code) return;
+        const p = state.players?.find(p => p.id === x.playerId);
+        if (p) {
+          p.networkRttMs = x.rttMs;
+          p.networkJitterMs = x.jitterMs;
+          p.syncReady = x.syncReady;
+          updatePlayerNetwork(x.playerId);
+        }
+      });
+      socket.on("playerPresence", x => {
+        if (!state || x.code !== code) return;
+        const p = state.players?.find(p => p.id === x.playerId);
+        if (!p) return;
+        p.connected = !!x.connected;
+        p.syncReady = !!x.syncReady;
+        updatePlayerNetwork(x.playerId);
+      });
+      socket.on("roomClosed", x => {
+        if (x.code !== code) return;
+        localStorage.removeItem("sgHostToken");
+        localStorage.removeItem("sgRoomCode");
+        code = "";
+        hostToken = "";
+        state = null;
+        data = null;
+        selectedGameId = "";
+        hostSpecialCells = {};
+        renderStart();
+      });
+      function emit(ev, p = {}, cb = () => {}) {
+        socket.emit(ev, { code, ...p }, cb);
+      }
+      function hostBoardHTML() {
+        const r = data.rounds[state.round];
+        let h = '<div class="grid">';
+        r.categories.forEach(c => (h += `<div class="cat">${GameUI.esc(c.name)}</div>`));
+        for (let qi = 0; qi < 5; qi++) {
+          r.categories.forEach((c, ci) => {
+            const q = c.questions[qi],
+              key = `${state.round}:${ci}:${qi}`,
+              used = state.used[key],
+              selected =
+                state.selectedTile?.round === state.round
+                && state.selectedTile.ci === ci
+                && state.selectedTile.qi === qi;
+            const special = hostSpecialCells[key];
+            const mark =
+              q.type === "triplet"
+                ? "🔥"
+                : special === "cat"
+                  ? "🐈"
+                  : special === "va_bank"
+                    ? "🎰"
+                    : special === "duel"
+                      ? "⚔️"
+                      : q.cat
+                        ? "🐈"
+                        : "";
+            const title =
+              q.type === "triplet"
+                ? "ТРИПЛЕТ"
+                : special === "cat"
+                  ? "Кіт у мішку"
+                  : special === "va_bank"
+                    ? "ВА-БАНК"
+                    : special === "duel"
+                      ? "ДУЕЛЬ"
+                      : q.cat
+                        ? "Кіт у мішку"
+                        : "";
+            h += `<button class="tile ${used ? "used" : ""} ${selected ? "tile-selecting" : ""}" data-ci="${ci}" data-qi="${qi}" ${used || state.selectedTile ? "disabled" : ""} title="${title}"><span>${q.value}</span>${mark ? ` <span style="font-size:.55em;vertical-align:middle">${mark}</span>` : ""}</button>`;
+          });
+        }
+        return h + "</div>";
+      }
 
-function seasonSaveHTML(){if(state?.phase!=='final_result')return '';return `<div class="panel" style="margin-top:20px;border:1px solid #8d70d8"><h2>🏆 Зберегти результат у сезон</h2>${state.savedSeasonGameId?`<p><b>✅ Результат уже збережено.</b>${state.seasonFinal?.isGrandFinal?' 👑 Grand Final: сезонні очки ×2.':''}</p><a class="btn gold" href="/seasons" target="_blank">Відкрити таблицю сезону</a>`:`<div id="seasonSaveArea"><p class="muted">Завантажуємо список сезонів…</p></div>`}</div>`}
-function seasonCeremonyHTML(){if(state?.phase!=='final_result'||!state.seasonFinal?.leaderboard?.length)return '';const rs=state.seasonFinal.leaderboard,shown=Math.min(state.seasonRevealCount||0,rs.length),nextPlace=rs.length-shown;return `<div class="panel" style="margin-top:20px;border:1px solid #d8ad42"><h2>👑 Сезонні підсумки • ${GameUI.esc(state.seasonFinal.name||'Сезон')}</h2><p class="muted">Grand Final нараховано з подвійними очками. Окрема церемонія виводиться на OBS від останнього місця до чемпіона.</p><div class="finalList">${rs.map((p,i)=>`<div class="finalItem" style="${state.seasonCeremonyActive&&i<rs.length-shown?'opacity:.35':''}"><span><b>${i+1}. ${GameUI.esc(p.name)}</b></span><span><b>${p.seasonPoints}</b> сезонних балів • ${p.wins} перемог • ${p.podiums} подіумів</span></div>`).join('')}</div><div class="row" style="justify-content:center;margin-top:14px">${!state.seasonCeremonyActive?'<button class="btn gold" id="startSeasonCeremony">🎬 ПОКАЗАТИ СЕЗОННІ ПІДСУМКИ В OBS</button>':shown<rs.length?`<button class="btn gold" id="revealNextSeason">🎬 ВІДКРИТИ ${nextPlace} МІСЦЕ</button>`:'<div class="winner" style="font-size:24px">🏆 Чемпіон сезону відкритий</div>'}${state.seasonCeremonyActive?'<button class="btn secondary" id="closeSeasonCeremony">Закрити сезонну церемонію</button>':''}</div></div>`}
-function loadSeasonSaveArea(){const area=document.getElementById('seasonSaveArea');if(!area)return;emit('seasonListHost',{},r=>{if(!r?.ok){area.innerHTML=`<p>${GameUI.esc(r?.error||'Помилка')}</p>`;return}const active=(r.seasons||[]).filter(s=>s.status==='active');area.innerHTML=active.length?`<div class="row"><select id="seasonSelect" style="min-width:220px">${active.map(s=>`<option value="${s.id}">${GameUI.esc(s.name)}</option>`).join('')}</select><label style="display:flex;gap:8px;align-items:center"><input id="grandFinal" type="checkbox" style="width:auto"> 👑 Grand Final (сезонні очки ×2)</label><button class="btn gold" id="saveSeasonResult">💾 Зберегти результат у сезон</button></div>`:`<p class="muted">Немає активного сезону. Створіть його в блоці «🏆 Керування сезонами» нижче.</p>`;const save=document.getElementById('saveSeasonResult');if(save)save.onclick=()=>emit('saveSeasonResult',{seasonId:document.getElementById('seasonSelect').value,isGrandFinal:document.getElementById('grandFinal').checked},x=>{if(!x?.ok)alert(x?.error||'Помилка');else alert('Результат збережено в сезон!')})})}
+      function seasonSaveHTML() {
+        if (state?.phase !== "final_result") return "";
+        return `<div class="panel" style="margin-top:20px;border:1px solid #8d70d8"><h2>🏆 Зберегти результат у сезон</h2>${state.savedSeasonGameId ? `<p><b>✅ Результат уже збережено.</b>${state.seasonFinal?.isGrandFinal ? " 👑 Grand Final: сезонні очки ×2." : ""}</p><a class="btn gold" href="/seasons" target="_blank">Відкрити таблицю сезону</a>` : `<div id="seasonSaveArea"><p class="muted">Завантажуємо список сезонів…</p></div>`}</div>`;
+      }
+      function seasonCeremonyHTML() {
+        if (state?.phase !== "final_result" || !state.seasonFinal?.leaderboard?.length) return "";
+        const rs = state.seasonFinal.leaderboard,
+          shown = Math.min(state.seasonRevealCount || 0, rs.length),
+          nextPlace = rs.length - shown;
+        return `<div class="panel" style="margin-top:20px;border:1px solid #d8ad42"><h2>👑 Сезонні підсумки • ${GameUI.esc(state.seasonFinal.name || "Сезон")}</h2><p class="muted">Grand Final нараховано з подвійними очками. Окрема церемонія виводиться на OBS від останнього місця до чемпіона.</p><div class="finalList">${rs.map((p, i) => `<div class="finalItem" style="${state.seasonCeremonyActive && i < rs.length - shown ? "opacity:.35" : ""}"><span><b>${i + 1}. ${GameUI.esc(p.name)}</b></span><span><b>${p.seasonPoints}</b> сезонних балів • ${p.wins} перемог • ${p.podiums} подіумів</span></div>`).join("")}</div><div class="row" style="justify-content:center;margin-top:14px">${!state.seasonCeremonyActive ? '<button class="btn gold" id="startSeasonCeremony">🎬 ПОКАЗАТИ СЕЗОННІ ПІДСУМКИ В OBS</button>' : shown < rs.length ? `<button class="btn gold" id="revealNextSeason">🎬 ВІДКРИТИ ${nextPlace} МІСЦЕ</button>` : '<div class="winner" style="font-size:24px">🏆 Чемпіон сезону відкритий</div>'}${state.seasonCeremonyActive ? '<button class="btn secondary" id="closeSeasonCeremony">Закрити сезонну церемонію</button>' : ""}</div></div>`;
+      }
+      function loadSeasonSaveArea() {
+        const area = document.getElementById("seasonSaveArea");
+        if (!area) return;
+        emit("seasonListHost", {}, r => {
+          if (!r?.ok) {
+            area.innerHTML = `<p>${GameUI.esc(r?.error || "Помилка")}</p>`;
+            return;
+          }
+          const active = (r.seasons || []).filter(s => s.status === "active");
+          area.innerHTML = active.length
+            ? `<div class="row"><select id="seasonSelect" style="min-width:220px">${active.map(s => `<option value="${s.id}">${GameUI.esc(s.name)}</option>`).join("")}</select><label style="display:flex;gap:8px;align-items:center"><input id="grandFinal" type="checkbox" style="width:auto"> 👑 Grand Final (сезонні очки ×2)</label><button class="btn gold" id="saveSeasonResult">💾 Зберегти результат у сезон</button></div>`
+            : `<p class="muted">Немає активного сезону. Створіть його в блоці «🏆 Керування сезонами» нижче.</p>`;
+          const save = document.getElementById("saveSeasonResult");
+          if (save)
+            save.onclick = () =>
+              emit(
+                "saveSeasonResult",
+                {
+                  seasonId: document.getElementById("seasonSelect").value,
+                  isGrandFinal: document.getElementById("grandFinal").checked,
+                },
+                x => {
+                  if (!x?.ok) alert(x?.error || "Помилка");
+                  else alert("Результат збережено в сезон!");
+                },
+              );
+        });
+      }
 
-function seasonPointsWord(n){n=Math.abs(Number(n)||0)%100;const n10=n%10;if(n>10&&n<20)return 'балів';if(n10===1)return 'бал';if(n10>=2&&n10<=4)return 'бали';return 'балів'}
-function seasonManagerHTML(){
- if(!state)return '';
- return `<details class="panel" style="margin-top:20px" ontoggle="if(this.open && !this.dataset.loaded){this.dataset.loaded='1';loadSeasonManagerArea()}"><summary style="cursor:pointer;font-size:20px;font-weight:800">🏆 Керування сезонами</summary><div id="seasonManagerArea" style="margin-top:14px"><p class="muted">Відкрийте панель, щоб завантажити сезони.</p></div></details>`;
-}
-async function loadSeasonManagerArea(){
- const area=document.getElementById('seasonManagerArea');if(!area)return;
- try{
-   const r=await fetch('/api/seasons',{cache:'no-store'}),payload=await r.json();
-   if(!r.ok)throw Error(payload.error||'Не вдалося завантажити сезони.');
-   const seasons=payload.seasons||[],active=seasons.find(s=>s.status==='active');
-   const q=active?.qualification,qHtml=active?.seasonFormat==='qualifiers'?`<div style="margin-top:12px;padding:12px;border:1px solid #514176;border-radius:12px"><b>🎯 Відбір: ${q?.qualifierGamesPlayed||0}/3</b><div style="margin-top:8px">🏆 У Grand Final: ${(q?.qualifiers||[]).map(x=>GameUI.esc(x.name)).join(', ')||'ще ніхто'}</div><div style="margin-top:6px">🎟️ ${q?.qualifierGamesPlayed>=3?'Wild Card':'Лідер Wild Card'}: <b>${GameUI.esc((q?.wildCard||q?.wildCardLeader)?.name||'—')}</b>${(q?.wildCard||q?.wildCardLeader)?` • ${(q.wildCard||q.wildCardLeader).seasonPoints} ${seasonPointsWord((q.wildCard||q.wildCardLeader).seasonPoints)} • ігровий рахунок ${(q.wildCard||q.wildCardLeader).score}`:''}</div></div>`:'';const activeHtml=active?`<div style="padding:14px;border:1px solid #6e53a8;border-radius:14px"><div class="top"><div><h3 style="margin:0">🟢 ${GameUI.esc(active.name)}</h3><div class="muted">${active.games.length} ігор • ${active.leaderboard.length} гравців</div></div><button class="btn bad finishSeason" data-id="${active.id}" data-name="${GameUI.esc(active.name)}">🏁 Завершити сезон</button></div>${qHtml}${active.seasonFormat!=='qualifiers'&&active.leaderboard.length?`<div class="muted" style="margin-top:10px">Лідер зараз: <b>${GameUI.esc(active.leaderboard[0].name)}</b> — ${active.leaderboard[0].seasonPoints} ${seasonPointsWord(active.leaderboard[0].seasonPoints)}</div>`:''}${active.games.length?`<div style="margin-top:14px"><h4 style="margin:0 0 8px">Збережені ігри</h4>${active.games.map(g=>`<div class="finalItem"><span><b>${GameUI.esc(g.title||g.gameId||'Гра')}</b>${g.isGrandFinal?' • 👑 Grand Final':''}<div class="muted">${GameUI.esc(g.roomCode||'')} • ${(g.results||[]).map(x=>GameUI.esc(x.name)).join(', ')}</div></span><button class="btn bad deleteSeasonGame" data-id="${g.id}" data-title="${GameUI.esc(g.title||'цю гру')}">🗑 Видалити</button></div>`).join('')}</div>`:''}</div>`:`<div class="center"><h3>Немає активного сезону</h3><p class="muted">Створіть наступний сезон для нових ігор.</p></div>`;
-   const completed=seasons.filter(s=>s.status==='completed');
-   const archiveHtml=completed.length?`<div style="margin-top:16px"><h3>📚 Архів сезонів</h3>${completed.map(s=>`<div class="finalItem"><span><b>${GameUI.esc(s.name)}</b>${s.champion?` • 🏆 ${GameUI.esc(s.champion.name)}`:''}<div class="muted">${s.games.length} ігор</div></span><button class="btn secondary reopenSeason" data-id="${s.id}">↩ Відновити</button></div>`).join('')}</div>`:'';
-   const createHtml=!active?`<div class="row" style="margin-top:16px"><input id="managerNewSeasonName" value="Сезон ${seasons.length+1}" style="max-width:260px"><button class="btn gold" id="managerCreateSeason">➕ Створити наступний сезон</button></div>`:'';
-   area.innerHTML=activeHtml+createHtml+archiveHtml+`<div class="row" style="margin-top:16px"><a class="btn secondary" href="/seasons" target="_blank">Відкрити публічну таблицю →</a></div>`;
-   area.querySelectorAll('.deleteSeasonGame').forEach(b=>b.onclick=()=>{if(!confirm(`Видалити «${b.dataset.title}» із сезону? Результати цієї гри та її сезонні бали буде видалено.`))return;emit('deleteSavedSeasonResult',{gameId:b.dataset.id},x=>{if(!x?.ok)alert(x?.error||'Помилка');else{loadSeasonManagerArea();loadSeasonSaveArea()}})});
-    area.querySelectorAll('.finishSeason').forEach(b=>b.onclick=()=>{if(!confirm(`Завершити «${b.dataset.name}»? Сезон перейде в архів, а переможець стане чемпіоном.`))return;emit('setSeasonStatus',{seasonId:b.dataset.id,status:'completed'},x=>{if(!x?.ok)alert(x?.error||'Помилка');else{loadSeasonManagerArea();loadSeasonSaveArea()}})});
-   area.querySelectorAll('.reopenSeason').forEach(b=>b.onclick=()=>{if(!confirm('Відновити цей сезон як активний?'))return;emit('setSeasonStatus',{seasonId:b.dataset.id,status:'active'},x=>{if(!x?.ok)alert(x?.error||'Помилка');else{loadSeasonManagerArea();loadSeasonSaveArea()}})});
-   const create=document.getElementById('managerCreateSeason');if(create)create.onclick=()=>{const name=document.getElementById('managerNewSeasonName').value.trim();if(!name)return alert('Вкажіть назву сезону.');emit('createSeason',{name},x=>{if(!x?.ok)alert(x?.error||'Помилка');else{loadSeasonManagerArea();loadSeasonSaveArea()}})};
- }catch(e){area.innerHTML=`<p>${GameUI.esc(e.message||'Помилка')}</p>`}
-}
+      function seasonPointsWord(n) {
+        n = Math.abs(Number(n) || 0) % 100;
+        const n10 = n % 10;
+        if (n > 10 && n < 20) return "балів";
+        if (n10 === 1) return "бал";
+        if (n10 >= 2 && n10 <= 4) return "бали";
+        return "балів";
+      }
+      function seasonManagerHTML() {
+        if (!state) return "";
+        return `<details class="panel" style="margin-top:20px" ontoggle="if(this.open && !this.dataset.loaded){this.dataset.loaded='1';loadSeasonManagerArea()}"><summary style="cursor:pointer;font-size:20px;font-weight:800">🏆 Керування сезонами</summary><div id="seasonManagerArea" style="margin-top:14px"><p class="muted">Відкрийте панель, щоб завантажити сезони.</p></div></details>`;
+      }
+      async function loadSeasonManagerArea() {
+        const area = document.getElementById("seasonManagerArea");
+        if (!area) return;
+        try {
+          const r = await fetch("/api/seasons", { cache: "no-store" }),
+            payload = await r.json();
+          if (!r.ok) throw Error(payload.error || "Не вдалося завантажити сезони.");
+          const seasons = payload.seasons || [],
+            active = seasons.find(s => s.status === "active");
+          const q = active?.qualification,
+            qHtml =
+              active?.seasonFormat === "qualifiers"
+                ? `<div style="margin-top:12px;padding:12px;border:1px solid #514176;border-radius:12px"><b>🎯 Відбір: ${q?.qualifierGamesPlayed || 0}/3</b><div style="margin-top:8px">🏆 У Grand Final: ${(q?.qualifiers || []).map(x => GameUI.esc(x.name)).join(", ") || "ще ніхто"}</div><div style="margin-top:6px">🎟️ ${q?.qualifierGamesPlayed >= 3 ? "Wild Card" : "Лідер Wild Card"}: <b>${GameUI.esc((q?.wildCard || q?.wildCardLeader)?.name || "—")}</b>${q?.wildCard || q?.wildCardLeader ? ` • ${(q.wildCard || q.wildCardLeader).seasonPoints} ${seasonPointsWord((q.wildCard || q.wildCardLeader).seasonPoints)} • ігровий рахунок ${(q.wildCard || q.wildCardLeader).score}` : ""}</div></div>`
+                : "";
+          const activeHtml = active
+            ? `<div style="padding:14px;border:1px solid #6e53a8;border-radius:14px"><div class="top"><div><h3 style="margin:0">🟢 ${GameUI.esc(active.name)}</h3><div class="muted">${active.games.length} ігор • ${active.leaderboard.length} гравців</div></div><button class="btn bad finishSeason" data-id="${active.id}" data-name="${GameUI.esc(active.name)}">🏁 Завершити сезон</button></div>${qHtml}${active.seasonFormat !== "qualifiers" && active.leaderboard.length ? `<div class="muted" style="margin-top:10px">Лідер зараз: <b>${GameUI.esc(active.leaderboard[0].name)}</b> — ${active.leaderboard[0].seasonPoints} ${seasonPointsWord(active.leaderboard[0].seasonPoints)}</div>` : ""}${active.games.length ? `<div style="margin-top:14px"><h4 style="margin:0 0 8px">Збережені ігри</h4>${active.games.map(g => `<div class="finalItem"><span><b>${GameUI.esc(g.title || g.gameId || "Гра")}</b>${g.isGrandFinal ? " • 👑 Grand Final" : ""}<div class="muted">${GameUI.esc(g.roomCode || "")} • ${(g.results || []).map(x => GameUI.esc(x.name)).join(", ")}</div></span><button class="btn bad deleteSeasonGame" data-id="${g.id}" data-title="${GameUI.esc(g.title || "цю гру")}">🗑 Видалити</button></div>`).join("")}</div>` : ""}</div>`
+            : `<div class="center"><h3>Немає активного сезону</h3><p class="muted">Створіть наступний сезон для нових ігор.</p></div>`;
+          const completed = seasons.filter(s => s.status === "completed");
+          const archiveHtml = completed.length
+            ? `<div style="margin-top:16px"><h3>📚 Архів сезонів</h3>${completed.map(s => `<div class="finalItem"><span><b>${GameUI.esc(s.name)}</b>${s.champion ? ` • 🏆 ${GameUI.esc(s.champion.name)}` : ""}<div class="muted">${s.games.length} ігор</div></span><button class="btn secondary reopenSeason" data-id="${s.id}">↩ Відновити</button></div>`).join("")}</div>`
+            : "";
+          const createHtml = !active
+            ? `<div class="row" style="margin-top:16px"><input id="managerNewSeasonName" value="Сезон ${seasons.length + 1}" style="max-width:260px"><button class="btn gold" id="managerCreateSeason">➕ Створити наступний сезон</button></div>`
+            : "";
+          area.innerHTML =
+            activeHtml
+            + createHtml
+            + archiveHtml
+            + `<div class="row" style="margin-top:16px"><a class="btn secondary" href="/seasons" target="_blank">Відкрити публічну таблицю →</a></div>`;
+          area.querySelectorAll(".deleteSeasonGame").forEach(
+            b =>
+              (b.onclick = () => {
+                if (
+                  !confirm(
+                    `Видалити «${b.dataset.title}» із сезону? Результати цієї гри та її сезонні бали буде видалено.`,
+                  )
+                )
+                  return;
+                emit("deleteSavedSeasonResult", { gameId: b.dataset.id }, x => {
+                  if (!x?.ok) alert(x?.error || "Помилка");
+                  else {
+                    loadSeasonManagerArea();
+                    loadSeasonSaveArea();
+                  }
+                });
+              }),
+          );
+          area.querySelectorAll(".finishSeason").forEach(
+            b =>
+              (b.onclick = () => {
+                if (!confirm(`Завершити «${b.dataset.name}»? Сезон перейде в архів, а переможець стане чемпіоном.`))
+                  return;
+                emit("setSeasonStatus", { seasonId: b.dataset.id, status: "completed" }, x => {
+                  if (!x?.ok) alert(x?.error || "Помилка");
+                  else {
+                    loadSeasonManagerArea();
+                    loadSeasonSaveArea();
+                  }
+                });
+              }),
+          );
+          area.querySelectorAll(".reopenSeason").forEach(
+            b =>
+              (b.onclick = () => {
+                if (!confirm("Відновити цей сезон як активний?")) return;
+                emit("setSeasonStatus", { seasonId: b.dataset.id, status: "active" }, x => {
+                  if (!x?.ok) alert(x?.error || "Помилка");
+                  else {
+                    loadSeasonManagerArea();
+                    loadSeasonSaveArea();
+                  }
+                });
+              }),
+          );
+          const create = document.getElementById("managerCreateSeason");
+          if (create)
+            create.onclick = () => {
+              const name = document.getElementById("managerNewSeasonName").value.trim();
+              if (!name) return alert("Вкажіть назву сезону.");
+              emit("createSeason", { name }, x => {
+                if (!x?.ok) alert(x?.error || "Помилка");
+                else {
+                  loadSeasonManagerArea();
+                  loadSeasonSaveArea();
+                }
+              });
+            };
+        } catch (e) {
+          area.innerHTML = `<p>${GameUI.esc(e.message || "Помилка")}</p>`;
+        }
+      }
 
-function hostPlayersHTML(players,buzzer){
- const answerer=GameUI.answererId(state);
- return `<div class="scorebar">${(players||[]).map(p=>{
-   const rtt=Number.isFinite(Number(p.networkRttMs))?Math.round(Number(p.networkRttMs)):null;
-   const jitter=Number.isFinite(Number(p.networkJitterMs))?Math.round(Number(p.networkJitterMs)):null;
-   const ready=!p.connected?'🔴 LOST':p.syncReady?'🟢 READY':'🟡 SYNC…';
-   const net=rtt==null?'⚪ ping —':(rtt<80?'🟢':rtt<160?'🟡':'🔴')+' '+rtt+' ms'+(jitter==null?'':' • jitter '+jitter+' ms');
-   return `<div class="player ${GameUI.wrongAnswerClass(p,state)} ${p.id===answerer?'active':''} ${state?.voice?.speakingPlayerIds?.includes(p.id)?'voice-speaking':''}" data-player-id="${GameUI.esc(p.id)}"><div><b>${GameUI.esc(p.name)}</b> ${p.connected?'🟢':'⚫'} ${GameUI.reactionHTML(p,state)}</div><div class="muted player-network" style="font-size:12px;margin-top:4px">${ready} • ${net}</div><div class="score">${p.score}</div></div>`;
- }).join('')}</div>`;
-}
+      function hostPlayersHTML(players, buzzer) {
+        const answerer = GameUI.answererId(state);
+        return `<div class="scorebar">${(players || [])
+          .map(p => {
+            const rtt = Number.isFinite(Number(p.networkRttMs)) ? Math.round(Number(p.networkRttMs)) : null;
+            const jitter = Number.isFinite(Number(p.networkJitterMs)) ? Math.round(Number(p.networkJitterMs)) : null;
+            const ready = !p.connected ? "🔴 LOST" : p.syncReady ? "🟢 READY" : "🟡 SYNC…";
+            const net =
+              rtt == null
+                ? "⚪ ping —"
+                : (rtt < 80 ? "🟢" : rtt < 160 ? "🟡" : "🔴")
+                  + " "
+                  + rtt
+                  + " ms"
+                  + (jitter == null ? "" : " • jitter " + jitter + " ms");
+            return `<div class="player ${GameUI.wrongAnswerClass(p, state)} ${p.id === answerer ? "active" : ""} ${state?.voice?.speakingPlayerIds?.includes(p.id) ? "voice-speaking" : ""}" data-player-id="${GameUI.esc(p.id)}"><div><b>${GameUI.esc(p.name)}</b> ${p.connected ? "🟢" : "⚫"} ${GameUI.reactionHTML(p, state)}</div><div class="muted player-network" style="font-size:12px;margin-top:4px">${ready} • ${net}</div><div class="score">${p.score}</div></div>`;
+          })
+          .join("")}</div>`;
+      }
 
-function voiceControlsHTML(){
- if(!state)return '';
- const active=state.voice?.speakingPlayerIds||[];
- const connected=voiceBotStatus==='connected',busy=voiceBotStatus==='connecting'||voiceBotStatus==='starting';
- const statusText=connected?'🟢 Увімкнено':busy?'🟡 Підключення…':voiceBotStatus==='unavailable'?'🔴 Недоступно':'⚫ Вимкнено';
- return `<details id="voicePanel" class="panel" style="margin-top:14px" ${voicePanelOpen?'open':''}><summary style="cursor:pointer;font-weight:900">🎙️ Discord Active Speaker — ${statusText}</summary>
- <div class="row" style="margin:12px 0;align-items:center"><button class="btn ${connected?'secondary':'gold'}" id="voiceToggle" ${busy?'disabled':''}>${connected?'■ Вимкнути Discord Active Speaker':'▶ Увімкнути Discord Active Speaker'}</button><b>${statusText}</b></div>
- ${voiceBotError?`<p class="bad">${GameUI.esc(voiceBotError)}</p>`:''}
+      function voiceControlsHTML() {
+        if (!state) return "";
+        const active = state.voice?.speakingPlayerIds || [];
+        const connected = voiceBotStatus === "connected",
+          busy = voiceBotStatus === "connecting" || voiceBotStatus === "starting";
+        const statusText = connected
+          ? "🟢 Увімкнено"
+          : busy
+            ? "🟡 Підключення…"
+            : voiceBotStatus === "unavailable"
+              ? "🔴 Недоступно"
+              : "⚫ Вимкнено";
+        return `<details id="voicePanel" class="panel" style="margin-top:14px" ${voicePanelOpen ? "open" : ""}><summary style="cursor:pointer;font-weight:900">🎙️ Discord Active Speaker — ${statusText}</summary>
+ <div class="row" style="margin:12px 0;align-items:center"><button class="btn ${connected ? "secondary" : "gold"}" id="voiceToggle" ${busy ? "disabled" : ""}>${connected ? "■ Вимкнути Discord Active Speaker" : "▶ Увімкнути Discord Active Speaker"}</button><b>${statusText}</b></div>
+ ${voiceBotError ? `<p class="bad">${GameUI.esc(voiceBotError)}</p>` : ""}
  <p class="muted">Бот залишається онлайн у Discord, але до голосового каналу підключається тільки після натискання кнопки. Discord ID не показується глядачам.</p>
- ${(state.players||[]).map(p=>`<div class="row" style="margin:10px 0;align-items:center"><b style="min-width:120px">${GameUI.esc(p.name)}</b><input class="voiceId" data-id="${p.id}" placeholder="Discord User ID" value="${GameUI.esc(Object.prototype.hasOwnProperty.call(voiceDraftIds,p.id)?voiceDraftIds[p.id]:(voiceMappings[p.id]||''))}" style="min-width:190px;flex:1"><button class="btn voiceSave" data-id="${p.id}">Зберегти ID</button><label><input type="checkbox" class="voiceTest" data-id="${p.id}" ${voiceTestIds.includes(p.id)?'checked':''}> 🎙️ Тест</label></div>`).join('')}
+ ${(state.players || []).map(p => `<div class="row" style="margin:10px 0;align-items:center"><b style="min-width:120px">${GameUI.esc(p.name)}</b><input class="voiceId" data-id="${p.id}" placeholder="Discord User ID" value="${GameUI.esc(Object.prototype.hasOwnProperty.call(voiceDraftIds, p.id) ? voiceDraftIds[p.id] : voiceMappings[p.id] || "")}" style="min-width:190px;flex:1"><button class="btn voiceSave" data-id="${p.id}">Зберегти ID</button><label><input type="checkbox" class="voiceTest" data-id="${p.id}" ${voiceTestIds.includes(p.id) ? "checked" : ""}> 🎙️ Тест</label></div>`).join("")}
  <div class="row"><button class="btn" id="voiceApply">▶ Показати активних</button><button class="btn secondary" id="voiceClear">■ Вимкнути підсвічування</button></div></details>`;
-}
-function hostControlsHTML(){
- if(!state)return '';
- const rows=(state.players||[]).map(p=>`
+      }
+      function hostControlsHTML() {
+        if (!state) return "";
+        const rows = (state.players || [])
+          .map(
+            p => `
    <div style="display:grid;grid-template-columns:minmax(130px,1fr) auto auto;gap:10px;align-items:center;padding:10px 0;border-bottom:1px solid rgba(255,255,255,.08)">
-     <div><b>${GameUI.esc(p.name)}</b><div class="muted">Рахунок: ${p.score}</div><div class="muted">${p.networkRttMs==null?'⚪ ping —':p.networkRttMs<80?'🟢 '+p.networkRttMs+' ms':p.networkRttMs<160?'🟡 '+p.networkRttMs+' ms':'🔴 '+p.networkRttMs+' ms'}${p.networkJitterMs!=null?' • jitter '+p.networkJitterMs+' ms':''}</div></div>
+     <div><b>${GameUI.esc(p.name)}</b><div class="muted">Рахунок: ${p.score}</div><div class="muted">${p.networkRttMs == null ? "⚪ ping —" : p.networkRttMs < 80 ? "🟢 " + p.networkRttMs + " ms" : p.networkRttMs < 160 ? "🟡 " + p.networkRttMs + " ms" : "🔴 " + p.networkRttMs + " ms"}${p.networkJitterMs != null ? " • jitter " + p.networkJitterMs + " ms" : ""}</div></div>
      <div class="row" style="gap:6px;flex-wrap:nowrap">
        <button class="btn secondary scoreQuick" data-id="${p.id}" data-v="-500" style="padding:8px 10px">−500</button>
        <button class="btn secondary scoreQuick" data-id="${p.id}" data-v="-100" style="padding:8px 10px">−100</button>
@@ -277,8 +857,10 @@ function hostControlsHTML(){
        <input class="scoreCustomInput" data-id="${p.id}" type="number" step="1" placeholder="+250 / -250" style="width:125px;margin:0">
        <button class="btn gold scoreCustom" data-id="${p.id}" style="padding:8px 12px">Застосувати</button>
      </div>
-   </div>`).join('');
- return `<details class="panel" style="margin-top:24px">
+   </div>`,
+          )
+          .join("");
+        return `<details class="panel" style="margin-top:24px">
    <summary style="cursor:pointer;font-size:20px;font-weight:800">⚙️ Керування ведучого</summary>
    <div style="margin-top:14px">
      <h3 style="margin-bottom:4px">Ручне коригування балів</h3>
@@ -288,7 +870,7 @@ function hostControlsHTML(){
        <h3 style="margin:0 0 6px">🚨 Аварійне керування</h3>
        <p class="muted" style="margin-top:0">Використовуй лише якщо під час ефіру завис логічний етап.</p>
        <div class="row">
-         <button class="btn gold" id="pauseGame">${state.paused?'▶ ПРОДОВЖИТИ':'⏸ ПАУЗА'}</button>
+         <button class="btn gold" id="pauseGame">${state.paused ? "▶ ПРОДОВЖИТИ" : "⏸ ПАУЗА"}</button>
          <button class="btn secondary" id="emergencyBuzz">🔔 Повернути BUZZ</button>
          <button class="btn secondary" id="emergencyReveal">👁 Відкрити відповідь</button>
          <button class="btn secondary" id="emergencyBoard">⏭ Закрити питання → дошка</button>
@@ -300,230 +882,752 @@ function hostControlsHTML(){
      </div>
    </div>
  </details>`;
-}
+      }
 
-
-function answerMediaHTML(cur){
- if(!cur||!['result','video_result'].includes(state?.phase))return '';
- const image=cur.answerImage?`<img src="${GameUI.esc(cur.answerImage)}" alt="Ілюстрація правильної відповіді" style="display:block;max-width:100%;max-height:40vh;object-fit:contain;margin:12px auto;border-radius:12px">`:'';
- return image;
-}
-function mediaQuestionHTML(cur,host=false){
- if(!cur||!['audio','audioReveal','video'].includes(cur.questionType))return '';
- const url=String(cur.media||'');
- if(!(url.startsWith('/media/')||/^https:\/\//i.test(url)))return '';
- const src=GameUI.esc(url),video=cur.questionType==='video',progress=cur.questionType==='audioReveal';
- const lastAudio=progress&&cur.revealStage>=cur.revealValues.length-1;
- const seconds=progress&&!lastAudio?Number(cur.revealSeconds?.[cur.revealStage]||2):0;
- const media=video?`<video class="quizMedia quizVideo" src="${src}" data-pause-at="${Number(cur.pauseAt||0)}" controls playsinline preload="metadata" style="width:100%;max-height:50vh"></video>`:`<audio class="quizMedia quizAudio" src="${src}" controls preload="metadata" style="width:100%"></audio>`;
- return `<div class="panel media-question" style="margin:12px auto;max-width:820px">${media}${progress?`<div class="muted">${lastAudio?'Повне аудіо':`Фрагмент до ${seconds} с`} · ${cur.value} балів</div>`:''}${host&&progress&&cur.revealStage<cur.revealValues.length-1?'<button class="btn gold" id="revealAudioStep">▶ Наступний фрагмент</button>':''}</div>`;
-}
-function captureMediaPlayback(){
- const el=document.querySelector('video.quizVideo,audio.quizAudio');
- if(!el||!state?.current)return null;
- return {node:el,src:el.getAttribute('src'),kind:el.tagName,stage:Number(state.current.revealStage||0),time:Number(el.currentTime||0),playing:!el.paused};
-}
-function stopDetachedMedia(snapshot){
- const el=document.querySelector('video.quizVideo,audio.quizAudio');
- if(!el)return;
- if(snapshot?.node===el){el.remove();return;}
- el.pause();el.removeAttribute('src');el.load();
-}
-function restoreMediaPlayback(snapshot){
- const fresh=document.querySelector('video.quizVideo,audio.quizAudio');
- if(!fresh||!snapshot?.node||!state?.current)return;
- const sameKind=fresh.tagName===snapshot.kind;
- const sameSrc=fresh.getAttribute('src')===snapshot.src;
- const sameStage=fresh.tagName==='VIDEO'||snapshot.stage===Number(state.current.revealStage||0);
- if(sameKind&&sameSrc&&sameStage){
-  fresh.replaceWith(snapshot.node);
-  const el=snapshot.node;
-  if(Number.isFinite(snapshot.time)&&Math.abs(el.currentTime-snapshot.time)>.15){try{el.currentTime=snapshot.time}catch(e){}}
-  if(snapshot.playing&&state?.phase!=='answering'){const p=el.play();if(p&&p.catch)p.catch(()=>{})}
-  else if(!snapshot.playing)el.pause();
-  return;
- }
- try{snapshot.node.pause();snapshot.node.removeAttribute('src');snapshot.node.load()}catch(e){}
-}
-function bindHostVideoControls(){
- const el=document.querySelector('video.quizVideo');
- if(!el||el.dataset.videoControlBound==='1')return;
- el.dataset.videoControlBound='1';
- const send=action=>{if(state?.current?.questionType==='video')socket.emit('hostVideoControl',{code:state.code,action,time:el.currentTime});};
- el.addEventListener('play',()=>send('play'));
- el.addEventListener('pause',()=>send('pause'));
- el.addEventListener('seeked',()=>send('seek'));
-}
-function bindHostAudioControls(){
- const el=document.querySelector('audio.quizAudio');
- if(!el||el.dataset.audioControlBound==='1')return;
- el.dataset.audioControlBound='1';
- const send=action=>{if(['audio','audioReveal'].includes(state?.current?.questionType))socket.emit('hostAudioControl',{code:state.code,action,time:el.currentTime});};
- el.addEventListener('play',()=>send('play'));
- el.addEventListener('pause',()=>send('pause'));
- el.addEventListener('seeked',()=>send('seek'));
-}
-function bindHostMediaControls(){bindHostVideoControls();bindHostAudioControls();}
-function resumeVideoResult(){}
-function limitMediaPreview(){
- const cur=state?.current;
- if(cur?.questionType==='video'&&cur.pauseAt){
-  document.querySelectorAll('video.quizMedia').forEach(el=>{
-   if(el.dataset.stopGuardBound==='1')return;
-   el.dataset.stopGuardBound='1';
-   const stop=()=>{
-    const live=state?.current;
-    if(!live||live.questionType!=='video'||live.media!==el.getAttribute('src'))return;
-    if(live.videoContinued||['result','video_result'].includes(state?.phase))return;
-    const stopAt=Number(live.pauseAt||0);
-    if(stopAt>0&&el.currentTime>=stopAt){
-     el.pause();
-     if(Math.abs(el.currentTime-stopAt)>.05)el.currentTime=stopAt;
-    }
-   };
-   el.addEventListener('timeupdate',stop);
-   el.addEventListener('seeking',stop);
-  });
- }
- if(cur?.questionType!=='audioReveal')return;
- if(['result','video_result'].includes(state?.phase))return; // After judging, host may replay the full recording.
- if(cur.revealStage>=cur.revealValues.length-1)return; // Final stage: play the entire recording.
- const seconds=Number(cur.revealSeconds?.[cur.revealStage]||2);
- const el=document.querySelector('audio.quizAudio');
- if(!el)return;
- const stage=Number(cur.revealStage||0);
- if(el.dataset.revealGuardStage===String(stage))return;
- el.dataset.revealGuardStage=String(stage);
- const guard=()=>{
-  const live=state?.current;
-  if(live?.questionType!=='audioReveal'||Number(live.revealStage||0)!==stage||['result','video_result'].includes(state?.phase))return;
-  if(el.currentTime>=seconds){el.pause();if(Math.abs(el.currentTime-seconds)>.05){try{el.currentTime=seconds}catch(e){}}}
- };
- el.addEventListener('timeupdate',guard);
- el.addEventListener('seeking',guard);
-}
-function emojiQuestionHTML(cur){return cur?.questionType==='emoji'&&cur.emoji?`<div class="emojiQuestion">${GameUI.esc(cur.emoji)}</div>`:'';}
-function imageRevealHTML(cur,host=false){
- if(!cur||cur.questionType!=='imageReveal')return '';
- const stage=Number(cur.revealStage||0), last=(cur.revealValues?.length||5)-1;
- const single=last===0; const blur=single?0:([28,20,13,7,0][Math.min(stage,4)] ?? 0);
- const scale=single?1:([1.12,1.09,1.06,1.03,1][Math.min(stage,4)] ?? 1);
- return `<div class="imageRevealWrap">
+      function answerMediaHTML(cur) {
+        if (!cur || !["result", "video_result"].includes(state?.phase)) return "";
+        const image = cur.answerImage
+          ? `<img src="${GameUI.esc(cur.answerImage)}" alt="Ілюстрація правильної відповіді" style="display:block;max-width:100%;max-height:40vh;object-fit:contain;margin:12px auto;border-radius:12px">`
+          : "";
+        return image;
+      }
+      function mediaQuestionHTML(cur, host = false) {
+        if (!cur || !["audio", "audioReveal", "video"].includes(cur.questionType)) return "";
+        const url = String(cur.media || "");
+        if (!(url.startsWith("/media/") || /^https:\/\//i.test(url))) return "";
+        const src = GameUI.esc(url),
+          video = cur.questionType === "video",
+          progress = cur.questionType === "audioReveal";
+        const lastAudio = progress && cur.revealStage >= cur.revealValues.length - 1;
+        const seconds = progress && !lastAudio ? Number(cur.revealSeconds?.[cur.revealStage] || 2) : 0;
+        const media = video
+          ? `<video class="quizMedia quizVideo" src="${src}" data-pause-at="${Number(cur.pauseAt || 0)}" controls playsinline preload="metadata" style="width:100%;max-height:50vh"></video>`
+          : `<audio class="quizMedia quizAudio" src="${src}" controls preload="metadata" style="width:100%"></audio>`;
+        return `<div class="panel media-question" style="margin:12px auto;max-width:820px">${media}${progress ? `<div class="muted">${lastAudio ? "Повне аудіо" : `Фрагмент до ${seconds} с`} · ${cur.value} балів</div>` : ""}${host && progress && cur.revealStage < cur.revealValues.length - 1 ? '<button class="btn gold" id="revealAudioStep">▶ Наступний фрагмент</button>' : ""}</div>`;
+      }
+      function captureMediaPlayback() {
+        const el = document.querySelector("video.quizVideo,audio.quizAudio");
+        if (!el || !state?.current) return null;
+        return {
+          node: el,
+          src: el.getAttribute("src"),
+          kind: el.tagName,
+          stage: Number(state.current.revealStage || 0),
+          time: Number(el.currentTime || 0),
+          playing: !el.paused,
+        };
+      }
+      function stopDetachedMedia(snapshot) {
+        const el = document.querySelector("video.quizVideo,audio.quizAudio");
+        if (!el) return;
+        if (snapshot?.node === el) {
+          el.remove();
+          return;
+        }
+        el.pause();
+        el.removeAttribute("src");
+        el.load();
+      }
+      function restoreMediaPlayback(snapshot) {
+        const fresh = document.querySelector("video.quizVideo,audio.quizAudio");
+        if (!fresh || !snapshot?.node || !state?.current) return;
+        const sameKind = fresh.tagName === snapshot.kind;
+        const sameSrc = fresh.getAttribute("src") === snapshot.src;
+        const sameStage = fresh.tagName === "VIDEO" || snapshot.stage === Number(state.current.revealStage || 0);
+        if (sameKind && sameSrc && sameStage) {
+          fresh.replaceWith(snapshot.node);
+          const el = snapshot.node;
+          if (Number.isFinite(snapshot.time) && Math.abs(el.currentTime - snapshot.time) > 0.15) {
+            try {
+              el.currentTime = snapshot.time;
+            } catch (e) {}
+          }
+          if (snapshot.playing && state?.phase !== "answering") {
+            const p = el.play();
+            if (p && p.catch) p.catch(() => {});
+          } else if (!snapshot.playing) el.pause();
+          return;
+        }
+        try {
+          snapshot.node.pause();
+          snapshot.node.removeAttribute("src");
+          snapshot.node.load();
+        } catch (e) {}
+      }
+      function bindHostVideoControls() {
+        const el = document.querySelector("video.quizVideo");
+        if (!el || el.dataset.videoControlBound === "1") return;
+        el.dataset.videoControlBound = "1";
+        const send = action => {
+          if (state?.current?.questionType === "video")
+            socket.emit("hostVideoControl", { code: state.code, action, time: el.currentTime });
+        };
+        el.addEventListener("play", () => send("play"));
+        el.addEventListener("pause", () => send("pause"));
+        el.addEventListener("seeked", () => send("seek"));
+      }
+      function bindHostAudioControls() {
+        const el = document.querySelector("audio.quizAudio");
+        if (!el || el.dataset.audioControlBound === "1") return;
+        el.dataset.audioControlBound = "1";
+        const send = action => {
+          if (["audio", "audioReveal"].includes(state?.current?.questionType))
+            socket.emit("hostAudioControl", { code: state.code, action, time: el.currentTime });
+        };
+        el.addEventListener("play", () => send("play"));
+        el.addEventListener("pause", () => send("pause"));
+        el.addEventListener("seeked", () => send("seek"));
+      }
+      function bindHostMediaControls() {
+        bindHostVideoControls();
+        bindHostAudioControls();
+      }
+      // Continue only videos explicitly configured for post-answer playback.
+      let autoResumedVideoKey = "";
+      function resumeVideoResult() {
+        const cur = state?.current;
+        if (state?.phase !== "result") {
+          autoResumedVideoKey = "";
+          return;
+        }
+        if (cur?.questionType !== "video" || !cur.videoContinued || !state.revealAnswer) return;
+        const question = data?.rounds?.[state.round]?.categories?.[cur.ci]?.questions?.[cur.qi];
+        if (question?.resumeOnAnswer !== true) return;
+        const key = [state.code, state.round, cur.ci, cur.qi].join(":");
+        if (autoResumedVideoKey === key) return;
+        const el = document.querySelector("video.quizVideo");
+        if (!el) return;
+        autoResumedVideoKey = key;
+        if (el.ended || !el.paused) return;
+        const playback = el.play(); // Existing hostVideoControl synchronizes OBS and players.
+        if (playback?.catch) playback.catch(err => console.warn("Auto-resume video after answer:", err));
+      }
+      function limitMediaPreview() {
+        const cur = state?.current;
+        if (cur?.questionType === "video" && cur.pauseAt) {
+          document.querySelectorAll("video.quizMedia").forEach(el => {
+            if (el.dataset.stopGuardBound === "1") return;
+            el.dataset.stopGuardBound = "1";
+            const stop = () => {
+              const live = state?.current;
+              if (!live || live.questionType !== "video" || live.media !== el.getAttribute("src")) return;
+              if (live.videoContinued || ["result", "video_result"].includes(state?.phase)) return;
+              const stopAt = Number(live.pauseAt || 0);
+              if (stopAt > 0 && el.currentTime >= stopAt) {
+                el.pause();
+                if (Math.abs(el.currentTime - stopAt) > 0.05) el.currentTime = stopAt;
+              }
+            };
+            el.addEventListener("timeupdate", stop);
+            el.addEventListener("seeking", stop);
+          });
+        }
+        if (cur?.questionType !== "audioReveal") return;
+        if (["result", "video_result"].includes(state?.phase)) return; // After judging, host may replay the full recording.
+        if (cur.revealStage >= cur.revealValues.length - 1) return; // Final stage: play the entire recording.
+        const seconds = Number(cur.revealSeconds?.[cur.revealStage] || 2);
+        const el = document.querySelector("audio.quizAudio");
+        if (!el) return;
+        const stage = Number(cur.revealStage || 0);
+        if (el.dataset.revealGuardStage === String(stage)) return;
+        el.dataset.revealGuardStage = String(stage);
+        const guard = () => {
+          const live = state?.current;
+          if (
+            live?.questionType !== "audioReveal"
+            || Number(live.revealStage || 0) !== stage
+            || ["result", "video_result"].includes(state?.phase)
+          )
+            return;
+          if (el.currentTime >= seconds) {
+            el.pause();
+            if (Math.abs(el.currentTime - seconds) > 0.05) {
+              try {
+                el.currentTime = seconds;
+              } catch (e) {}
+            }
+          }
+        };
+        el.addEventListener("timeupdate", guard);
+        el.addEventListener("seeking", guard);
+      }
+      function emojiQuestionHTML(cur) {
+        return cur?.questionType === "emoji" && cur.emoji
+          ? `<div class="emojiQuestion">${GameUI.esc(cur.emoji)}</div>`
+          : "";
+      }
+      function imageRevealHTML(cur, host = false) {
+        if (!cur || cur.questionType !== "imageReveal") return "";
+        const stage = Number(cur.revealStage || 0),
+          last = (cur.revealValues?.length || 5) - 1;
+        const single = last === 0;
+        const blur = single ? 0 : ([28, 20, 13, 7, 0][Math.min(stage, 4)] ?? 0);
+        const scale = single ? 1 : ([1.12, 1.09, 1.06, 1.03, 1][Math.min(stage, 4)] ?? 1);
+        return `<div class="imageRevealWrap">
    <div class="imageRevealValue">${cur.value} БАЛІВ</div>
-   <div class="imageRevealFrame"><img src="${GameUI.esc(cur.image||'')}" class="imageRevealImg" style="filter:blur(${blur}px);transform:scale(${scale})"></div>
-   ${single?'':`<div class="muted center">Відкриття ${stage+1}/${last+1}</div>`}
-   ${host&&stage<last?'<div class="row" style="justify-content:center;margin-top:12px"><button class="btn gold" id="revealImageStep">👁 ВІДКРИТИ ЩЕ → '+GameUI.esc(String(cur.revealValues[stage+1]))+' БАЛІВ</button></div>':''}
+   <div class="imageRevealFrame"><img src="${GameUI.esc(cur.image || "")}" class="imageRevealImg" style="filter:blur(${blur}px);transform:scale(${scale})"></div>
+   ${single ? "" : `<div class="muted center">Відкриття ${stage + 1}/${last + 1}</div>`}
+   ${host && stage < last ? '<div class="row" style="justify-content:center;margin-top:12px"><button class="btn gold" id="revealImageStep">👁 ВІДКРИТИ ЩЕ → ' + GameUI.esc(String(cur.revealValues[stage + 1])) + " БАЛІВ</button></div>" : ""}
  </div>`;
-}
-let numericClockHandle=null;
-function armNumericClock(){if(numericClockHandle){clearInterval(numericClockHandle);numericClockHandle=null}const el=document.getElementById('numericTimer'),remaining=Number(state?.numericChallenge?.remainingMs||0);if(!el||remaining<=0)return;const end=Date.now()+remaining;const tick=()=>{const left=Math.max(0,Math.ceil((end-Date.now())/1000));el.textContent=left;if(left<=0){clearInterval(numericClockHandle);numericClockHandle=null}};tick();numericClockHandle=setInterval(tick,200)}
-let audienceClockHandle=null;
-function armAudienceClock(){if(audienceClockHandle){clearInterval(audienceClockHandle);audienceClockHandle=null}const el=document.getElementById('audienceTimer');if(!el)return;const remaining=Math.max(0,Number(state?.audience?.remainingMs||0));const end=Date.now()+remaining;const tick=()=>{const left=Math.max(0,(end-Date.now())/1000);el.textContent=left.toFixed(1);if(left<=0){clearInterval(audienceClockHandle);audienceClockHandle=null}};tick();audienceClockHandle=setInterval(tick,100)}
-function render(){if(!state||!data)return;let h='';
- if(state.phase==='paused'){
-   h=`<div class="center"><div class="huge">⏸</div><h1>ТЕХНІЧНА ПАУЗА</h1><p class="muted">Гра зупинена. Таймери та дії гравців заблоковано.</p><p>Попередній етап: <b>${GameUI.esc(state.pausedPhase||'—')}</b></p></div>`;
- }
- else
- if(state.phase==='lobby'){h=`<h2>Лобі</h2><div class="roomCode">${state.code}</div><p>Гравці відкривають <b>${location.origin}/play?room=${state.code}</b></p><p>OBS: <b>${location.origin}/screen/${state.code}</b></p>${hostPlayersHTML(state.players)}<div class="row"><button class="btn" id="start">🎯 Почати розіграш першого ходу</button><button class="btn secondary" id="skipFirst">Пропустити розіграш</button><button class="btn secondary" id="newRoom">Нова кімната</button></div>`}
- else if(state.phase==='first_turn_quiz'){
-   const q=state.firstTurnQuiz||{}, submitted=q.submittedPlayerIds||[], status=q.timerStatus||'ready';
-   const allDone=submitted.length===state.players.length;
-   const canReveal=allDone||status==='expired';
-   const timerBlock=status==='running'
-     ? `<div class="huge"><span id="firstTurnTimer">${Math.max(0,Math.ceil(Number(q.remainingMs||0)/1000))}</span></div><div class="muted">секунд</div>`
-     : status==='expired'
-       ? `<div class="huge">0</div><div class="muted">⏱ Час вийшов</div>`
-       : `<div class="huge">30</div><div class="muted">Таймер ще не запущено</div>`;
-   h=`<div class="center"><div class="huge">🎯</div><h1>РОЗІГРАШ ПЕРШОГО ХОДУ</h1><div class="question">${GameUI.esc(q.question||'')}</div>${timerBlock}<p class="muted">Відповіді гравців приховані до відкриття.</p></div><div class="finalList">${state.players.map(p=>`<div class="finalItem"><span>${GameUI.esc(p.name)}</span><b>${submitted.includes(p.id)?'✅ відповідь є':status==='expired'?'❌ немає відповіді':'⏳ чекаємо'}</b></div>`).join('')}</div><div class="row" style="justify-content:center">${status==='ready'?'<button class="btn gold" id="startFirstTimer">▶ Запустити 30 секунд</button>':''}<button class="btn gold" id="revealFirst" ${canReveal?'':'disabled'}>👁 Відкрити результати</button><button class="btn secondary" id="skipFirst">Пропустити</button></div>`}
- else if(state.phase==='first_turn_result'){
-   const q=state.firstTurnQuiz, results=q.results||[], revealed=q.revealCount||0, total=results.length;
-   const nextIndex=total-1-revealed;
-   const nextLabel=revealed>=total?'Усі місця відкриті':revealed===total-1?'🥇 Показати переможця':`Показати ${nextIndex+1} місце`;
-   h=`<div class="center"><div class="huge">🎯 ${q.correctAnswer}</div><h2>Правильна відповідь</h2><p class="muted">${GameUI.esc(q.unit||'')}</p></div>
-   <div class="finalList">${results.map((r,i)=>`<div class="finalItem"><span><b>${i+1}. ${GameUI.esc(r.name)}</b></span><span>${r.noAnswer?'— немає відповіді':`Відповідь: <b>${r.answer}</b> • різниця: <b>${r.diff}</b>`}</span></div>`).join('')}</div>
+      }
+      let numericClockHandle = null;
+      function armNumericClock() {
+        if (numericClockHandle) {
+          clearInterval(numericClockHandle);
+          numericClockHandle = null;
+        }
+        const el = document.getElementById("numericTimer"),
+          remaining = Number(state?.numericChallenge?.remainingMs || 0);
+        if (!el || remaining <= 0) return;
+        const end = Date.now() + remaining;
+        const tick = () => {
+          const left = Math.max(0, Math.ceil((end - Date.now()) / 1000));
+          el.textContent = left;
+          if (left <= 0) {
+            clearInterval(numericClockHandle);
+            numericClockHandle = null;
+          }
+        };
+        tick();
+        numericClockHandle = setInterval(tick, 200);
+      }
+      let audienceClockHandle = null;
+      function armAudienceClock() {
+        if (audienceClockHandle) {
+          clearInterval(audienceClockHandle);
+          audienceClockHandle = null;
+        }
+        const el = document.getElementById("audienceTimer");
+        if (!el) return;
+        const remaining = Math.max(0, Number(state?.audience?.remainingMs || 0));
+        const end = Date.now() + remaining;
+        const tick = () => {
+          const left = Math.max(0, (end - Date.now()) / 1000);
+          el.textContent = left.toFixed(1);
+          if (left <= 0) {
+            clearInterval(audienceClockHandle);
+            audienceClockHandle = null;
+          }
+        };
+        tick();
+        audienceClockHandle = setInterval(tick, 100);
+      }
+      function render() {
+        if (!state || !data) return;
+        let h = "";
+        if (state.phase === "paused") {
+          h = `<div class="center"><div class="huge">⏸</div><h1>ТЕХНІЧНА ПАУЗА</h1><p class="muted">Гра зупинена. Таймери та дії гравців заблоковано.</p><p>Попередній етап: <b>${GameUI.esc(state.pausedPhase || "—")}</b></p></div>`;
+        } else if (state.phase === "lobby") {
+          h = `<h2>Лобі</h2><div class="roomCode">${state.code}</div><p>Гравці відкривають <b>${location.origin}/play?room=${state.code}</b></p><p>OBS: <b>${location.origin}/screen/${state.code}</b></p>${hostPlayersHTML(state.players)}<div class="row"><button class="btn" id="start">🎯 Почати розіграш першого ходу</button><button class="btn secondary" id="skipFirst">Пропустити розіграш</button><button class="btn secondary" id="newRoom">Нова кімната</button></div>`;
+        } else if (state.phase === "first_turn_quiz") {
+          const q = state.firstTurnQuiz || {},
+            submitted = q.submittedPlayerIds || [],
+            status = q.timerStatus || "ready";
+          const allDone = submitted.length === state.players.length;
+          const canReveal = allDone || status === "expired";
+          const timerBlock =
+            status === "running"
+              ? `<div class="huge"><span id="firstTurnTimer">${Math.max(0, Math.ceil(Number(q.remainingMs || 0) / 1000))}</span></div><div class="muted">секунд</div>`
+              : status === "expired"
+                ? `<div class="huge">0</div><div class="muted">⏱ Час вийшов</div>`
+                : `<div class="huge">30</div><div class="muted">Таймер ще не запущено</div>`;
+          h = `<div class="center"><div class="huge">🎯</div><h1>РОЗІГРАШ ПЕРШОГО ХОДУ</h1><div class="question">${GameUI.esc(q.question || "")}</div>${timerBlock}<p class="muted">Відповіді гравців приховані до відкриття.</p></div><div class="finalList">${state.players.map(p => `<div class="finalItem"><span>${GameUI.esc(p.name)}</span><b>${submitted.includes(p.id) ? "✅ відповідь є" : status === "expired" ? "❌ немає відповіді" : "⏳ чекаємо"}</b></div>`).join("")}</div><div class="row" style="justify-content:center">${status === "ready" ? '<button class="btn gold" id="startFirstTimer">▶ Запустити 30 секунд</button>' : ""}<button class="btn gold" id="revealFirst" ${canReveal ? "" : "disabled"}>👁 Відкрити результати</button><button class="btn secondary" id="skipFirst">Пропустити</button></div>`;
+        } else if (state.phase === "first_turn_result") {
+          const q = state.firstTurnQuiz,
+            results = q.results || [],
+            revealed = q.revealCount || 0,
+            total = results.length;
+          const nextIndex = total - 1 - revealed;
+          const nextLabel =
+            revealed >= total
+              ? "Усі місця відкриті"
+              : revealed === total - 1
+                ? "🥇 Показати переможця"
+                : `Показати ${nextIndex + 1} місце`;
+          h = `<div class="center"><div class="huge">🎯 ${q.correctAnswer}</div><h2>Правильна відповідь</h2><p class="muted">${GameUI.esc(q.unit || "")}</p></div>
+   <div class="finalList">${results.map((r, i) => `<div class="finalItem"><span><b>${i + 1}. ${GameUI.esc(r.name)}</b></span><span>${r.noAnswer ? "— немає відповіді" : `Відповідь: <b>${r.answer}</b> • різниця: <b>${r.diff}</b>`}</span></div>`).join("")}</div>
    <div class="center muted" style="margin:14px 0">OBS відкрито: <b>${revealed}/${total}</b></div>
    <div class="row" style="justify-content:center">
-     <button class="btn gold" id="revealNextFirst" ${revealed>=total?'disabled':''}>${nextLabel}</button>
-     <button class="btn" id="beginRoundOne" ${revealed<total?'disabled':''}>▶ ПОЧАТИ 1 РАУНД</button>
-   </div>`}
- else if(state.phase==='numeric_ready'){const n=state.numericChallenge||{};h=`<div class="center"><div class="huge">🔢 30</div><h1>ЧИСЛОВЕ ПИТАННЯ • ${n.value} БАЛІВ</h1><div class="question">${GameUI.esc(n.question||'')}</div><p class="muted">Гравці ще НЕ можуть відповідати.</p><button class="btn gold" id="startNumericTimer">▶ ЗАПУСТИТИ 30 СЕКУНД</button></div>`}
- else if(state.phase==='numeric_question'){const n=state.numericChallenge||{},sub=n.submittedPlayerIds||[],left=Math.max(0,Math.ceil(Number(n.remainingMs||0)/1000)),all=sub.length===state.players.length;h=`<div class="center"><div class="huge">🔢 <span id="numericTimer">${left}</span></div><h1>ЧИСЛОВЕ ПИТАННЯ • ${n.value} БАЛІВ</h1><div class="question">${GameUI.esc(n.question||'')}</div><p class="muted">Найближча відповідь забирає всі ${n.value} балів. Нічия → хто підтвердив раніше.</p></div><div class="finalList">${state.players.map(p=>`<div class="finalItem"><span>${GameUI.esc(p.name)}</span><b>${sub.includes(p.id)?'✅ відповідь є':'⏳ думає'}</b></div>`).join('')}</div><div class="row" style="justify-content:center"><button class="btn gold" id="finishNumeric" ${all||left===0?'':'disabled'}>👁 Відкрити результати</button></div>`}
- else if(state.phase==='numeric_result'){const n=state.numericChallenge||{},rs=n.results||[],rev=n.revealCount||0,total=rs.length,nextIndex=total-1-rev;h=`<div class="center"><div class="huge">${n.correctAnswer}</div><h2>ПРАВИЛЬНА ВІДПОВІДЬ</h2></div><div class="finalList">${rs.map((r,i)=>`<div class="finalItem"><span><b>${i+1}. ${GameUI.esc(r.name)}</b></span><span>${r.noAnswer?'— немає відповіді':`Відповідь: <b>${r.answer}</b> • різниця: <b>${r.diff}</b>${i===0?' • 🏆 +'+n.value:''}`}</span></div>`).join('')}</div><div class="row" style="justify-content:center"><button class="btn gold" id="revealNextNumeric" ${rev>=total?'disabled':''}>${rev>=total?'Усі місця відкриті':rev===total-1?'🥇 Показати переможця':`Показати ${nextIndex+1} місце`}</button><button class="btn" id="finishNumericResult" ${rev<total?'disabled':''}>До дошки</button></div>`}
- else if(state.phase==='audience_lobby'){const a=state.audience||{};h=`<div class="center"><div class="huge">👥</div><h1>${GameUI.esc(a.title||'ГРАЮТЬ ГЛЯДАЧІ')}</h1><p>Учасників: <b id="audienceJoined">${a.joined||0}</b></p><div style="display:flex;gap:18px;justify-content:center;align-items:center;flex-wrap:wrap;margin:18px 0"><img src="/audience-qr/${state.code}" alt="QR" style="width:150px;height:150px;background:#fff;padding:8px;border-radius:16px"><div style="text-align:left"><div class="muted">Посилання для глядачів</div><div style="font-size:20px;font-weight:900;word-break:break-all">${location.origin}/audience/${state.code}</div><div class="muted" style="margin-top:8px">Скануйте QR → введіть нік → приєднуйтесь</div></div></div><button class="btn gold" id="startAudienceQuestion" ${Number(a.joined||0)<1?'disabled':''}>▶ ПИТАННЯ 1/3 • ${Number(data.audienceQuestionSeconds||15)} СЕК</button>${Number(a.joined||0)<1?'<p class="muted" id="audienceWaiting">⏳ Чекаємо хоча б одного глядача…</p>':'<p class="muted" id="audienceWaiting" hidden>⏳ Чекаємо хоча б одного глядача…</p>'}</div>`}
- else if(state.phase==='audience_question'){const a=state.audience||{},left=Math.min(Number(a.questionSeconds||data.audienceQuestionSeconds||15),Math.max(0,Number(a.remainingMs||0)/1000));h=`<div class="center"><div class="huge">👥 <span id="audienceTimer">${left.toFixed(1)}</span></div><h1>ГЛЯДАЧІ • ${a.questionIndex+1}/${a.totalQuestions}</h1><div class="question">${GameUI.esc(a.question||'')}</div><p>Відповіли: <b id="audienceSubmitted">${a.submitted||0}/${a.joined||0}</b></p><button class="btn gold" id="finishAudienceQuestion">📊 ВІДКРИТИ ВІДПОВІДЬ</button></div>`}
- else if(state.phase==='audience_result'){const a=state.audience||{},last=a.questionIndex+1>=a.totalQuestions;h=`<div class="center"><h1>✅ ${'ABCD'[a.correct]} • ${GameUI.esc(a.options?.[a.correct]||'')}</h1><p>${GameUI.esc(a.fact||'')}</p><div class="finalList">${(a.options||[]).map((o,i)=>`<div class="finalItem"><span>${'ABCD'[i]} • ${GameUI.esc(o)}</span><b>${a.counts?.[i]||0}</b></div>`).join('')}</div><button class="btn gold" id="${last?'finishAudienceRound':'startAudienceQuestion'}">${last?'🏆 ПІДСУМКИ':'▶ НАСТУПНЕ ПИТАННЯ'}</button></div>`}
- else if(state.phase==='audience_podium'){const a=state.audience||{},rs=a.ranking||[],rev=a.revealCount||0,n=Math.min(5,rs.length);h=`<div class="center"><h1>🏆 ${GameUI.esc(a.title||'РЕЗУЛЬТАТИ')}</h1><p>Відкрито: ${rev}/${n}</p><div class="finalList">${rs.slice(0,n).map((r,i)=>`<div class="finalItem" style="${i>=n-rev?'':'opacity:.15'}"><span><b>${i+1}. ${GameUI.esc(r.name)}</b></span><span>${r.correct}/3 • ${(r.timeMs/1000).toFixed(2)} с${i===0&&a.winner&&hostAudienceWinner?.id===r.id?' • КОД '+GameUI.esc(hostAudienceWinner.code):''}</span></div>`).join('')}</div><div class="row" style="justify-content:center"><button class="btn gold" id="revealNextAudience" ${rev>=n?'disabled':''}>${rev>=n?'ТОП-5 ВІДКРИТО':'👁 ВІДКРИТИ НАСТУПНЕ МІСЦЕ'}</button><button class="btn" id="closeAudienceRound" ${rev<n?'disabled':''}>ПОВЕРНУТИСЯ ДО ГРИ</button></div></div>`}
- else if(state.phase==='board'){let chooser=state.players.find(p=>p.id===state.turnPlayerId);h=`<div class="top"><div><h2>${data.rounds[state.round].name}</h2><div class="muted">🎯 Питання обирає: <b>${GameUI.esc(chooser?.name||'—')}</b></div></div><div class="row">${(data.audienceRounds||[]).length>=2?(state.round===0?'<button class="btn gold" id="audience1">👥 Глядачі • Приз №1</button><button class="btn secondary" id="nextRound">Раунд 2</button>':'<button class="btn gold" id="audience2">👥 Глядачі • Приз №2</button><button class="btn gold" id="finalBets">Фінал</button>'):(state.round===0?'<button class="btn secondary" id="nextRound">Раунд 2</button>':'<button class="btn gold" id="finalBets">Фінал</button>')}</div></div>${state.round===1?'<div class="muted center" style="margin:8px 0 12px">Службові позначки ведучого: 🐈 Кіт у мішку • 🎰 ВА-БАНК • ⚔️ Дуель</div>':''}${hostBoardHTML()}${hostPlayersHTML(state.players)}`}
- else if(state.phase==='va_bank_bet'){let p=state.players.find(x=>x.id===state.vaBankPlayer);h=`<div class="center"><div class="huge">🎰</div><h1>ВА-БАНК!</h1><p class="muted">Ставку на телефоні робить <b>${GameUI.esc(p?.name||'гравець')}</b>.</p></div>${hostPlayersHTML(state.players)}`}
- else if(state.phase==='va_bank_question'){let p=state.players.find(x=>x.id===state.vaBankPlayer);h=`<div class="center"><div class="huge">🎰 ВА-БАНК • ${state.vaBankBet}</div></div><div class="question">${GameUI.esc(state.current.q)}</div>${emojiQuestionHTML(state.current)}<p class="center muted">Відповідає тільки ${GameUI.esc(p?.name||'гравець')}</p><div class="row" style="justify-content:center"><button class="btn gold" id="gong">🔔 ГОНГ</button><button class="btn good" id="vbCorrect">Правильно +${state.vaBankBet}</button><button class="btn bad" id="vbWrong">Неправильно −${state.vaBankBet}</button></div>${hostPlayersHTML(state.players)}`}
- else if(state.phase==='duel_choose'){let p=state.players.find(x=>x.id===state.turnPlayerId);h=`<div class="center"><div class="huge">⚔️</div><h1>ДУЕЛЬ!</h1><p class="muted">${GameUI.esc(p?.name||'Гравець')} обирає суперника на телефоні.</p></div>${hostPlayersHTML(state.players)}`}
- else if(state.phase==='duel_question'){let names=state.players.filter(p=>state.duelPlayers.includes(p.id)).map(p=>GameUI.esc(p.name)).join(' VS ');h=`<div class="center"><div class="huge">⚔️ ДУЕЛЬ</div><h2>${names}</h2></div><div class="question">${GameUI.esc(state.current.q)}</div><div class="row" style="justify-content:center"><button class="btn gold" id="gong">🔔 ГОНГ</button><button class="btn" id="openDuelBuzz">✨ ВІДКРИТИ BUZZ ДЛЯ ДУЕЛІ</button></div>${hostPlayersHTML(state.players)}`}
- else if(state.phase==='cat_choose'){h=`<h2>🐈 Кіт у мішку</h2><p class="question">${GameUI.esc(state.current.q)}</p><p class="muted center">Оберіть гравця, який відповідатиме.</p><div class="row" style="justify-content:center">${state.players.map(p=>`<button class="btn secondary catpick" data-id="${p.id}">${GameUI.esc(p.name)}</button>`).join('')}</div>${hostPlayersHTML(state.players)}`}
- else if(state.phase==='triplet_question'){const t=state.current?.triplet||{},p=state.players.find(x=>x.id===t.answererId);h=`<div class="center"><div class="huge">🔥 ТРИПЛЕТ</div><h2>Питання ${Number(t.index||0)+1}/${t.total||3} • ${state.current.value} БАЛІВ</h2><p class="muted">Відповідає: <b>${GameUI.esc(p?.name||'—')}</b> • усі 3 питання обов'язкові</p></div><div class="question">${GameUI.esc(state.current.q)}</div><div class="row" style="justify-content:center"><button class="btn gold" id="gong">🔔 ГОНГ</button><button class="btn good" id="tripletCorrect">Правильно +${state.current.value}</button><button class="btn bad" id="tripletWrong">Неправильно −${state.current.value}</button></div>${hostPlayersHTML(state.players)}`}
- else if(state.phase==='triplet_result'){const t=state.current?.triplet||{},last=Number(t.index||0)>=Number(t.total||3)-1;h=`<div class="center"><div class="huge">🔥 ТРИПЛЕТ • ${Number(t.index||0)+1}/${t.total||3}</div></div><div class="question">${GameUI.esc(state.current.q)}</div><div class="answer"><b>Правильна відповідь:</b> ${GameUI.esc(state.current.a)}</div><div class="row" style="justify-content:center"><button class="btn gold" id="nextTriplet">${last?'ЗАВЕРШИТИ ТРИПЛЕТ → ДО ДОШКИ':'НАСТУПНЕ ПИТАННЯ ТРИПЛЕТА →'}</button></div>${hostPlayersHTML(state.players)}`}
- else if(state.phase==='question'){h=`<div class="question">${GameUI.esc(state.current.q)}</div>${emojiQuestionHTML(state.current)}${imageRevealHTML(state.current,true)+mediaQuestionHTML(state.current,true)}<div class="row" style="justify-content:center"><button class="btn gold" id="gong">🔔 ГОНГ</button><button class="btn" id="openBuzz" ${state.players.some(p=>p.connected&&!p.syncReady)?'disabled title="Очікуємо синхронізації гравців"':''}>✨ ВІДКРИТИ BUZZ</button><button class="btn secondary" id="reveal">Ніхто не відповів</button></div>${hostPlayersHTML(state.players)}`}
- else if(state.phase==='buzz'){let locked=(state.answeringLocked||[]).length;h=`<div class="question">${GameUI.esc(state.current.q)}</div>${emojiQuestionHTML(state.current)}${imageRevealHTML(state.current,true)+mediaQuestionHTML(state.current,true)}<div class="center huge">BUZZ!</div><p class="center muted">${locked?`Уже помилилися: ${locked}. Чекаємо на іншого гравця…`:'Чекаємо на першого гравця…'}</p><div class="row" style="justify-content:center"><button class="btn secondary" id="reveal">Ніхто більше не відповідає</button></div>${hostPlayersHTML(state.players)}`}
- else if(state.phase==='answering'){let p=state.players.find(x=>x.id===state.buzzer);h=`<div class="question">${GameUI.esc(state.current.q)}</div>${emojiQuestionHTML(state.current)}${imageRevealHTML(state.current,false)+mediaQuestionHTML(state.current,true)}<h2 class="center">Відповідає: ${GameUI.esc(p?.name||'')}</h2><div class="row" style="justify-content:center">${state.current.sponsorDouble?`<button class="btn good" id="sponsorCorrect">🎙️ Ім’я + озвучка: +${state.current.value*2}</button>`:""}<button class="btn good" id="correct">Правильно +${state.current.value}</button><button class="btn bad" id="wrong">Неправильно −${state.current.value}</button></div>${hostPlayersHTML(state.players,state.buzzer)}`}
- else if(state.phase==='cat_question'){let p=state.players.find(x=>x.id===state.catReceiver);h=`<h2 class="center">🐈 Кіт у мішку — відповідає ${GameUI.esc(p?.name||'')}</h2><div class="question">${GameUI.esc(state.current.q)}</div>${emojiQuestionHTML(state.current)}<div class="row" style="justify-content:center"><button class="btn gold" id="gong">🔔 ГОНГ</button><button class="btn good" id="catCorrect">Правильно +${state.current.value}</button><button class="btn bad" id="catWrong">Неправильно −${state.current.value}</button></div>${hostPlayersHTML(state.players)}`}
- else if(state.phase==='result'){let reason=state.resultReason==='all_wrong'?'Усі гравці відповіли неправильно.':state.resultReason==='no_answer'?'Ніхто більше не відповідає.':state.resultReason==='correct'?'Є правильна відповідь!':state.resultReason==='va_bank_wrong'?'ВА-БАНК зіграно неправильно.':'';h=`<div class="question">${GameUI.esc(state.current.q)}</div>${mediaQuestionHTML(state.current,true)}${reason?`<p class="center muted">${reason}</p>`:''}<div class="answer"><b>Правильна відповідь:</b> ${GameUI.esc(state.current.a)}</div>${answerMediaHTML(state.current)}${state.current.answerAudio?`<div class="center"><button class="btn gold" id="playMurlocAnswer">🔊 Відтворити звук мурлока у ведучого та OBS</button></div>`:""}<div class="row" style="justify-content:center"><button class="btn" id="nextResult">До дошки</button></div>${hostPlayersHTML(state.players)}`}
- else if(state.phase==='final_bets'){h=`<h2>Фінал — ставки</h2><p class="muted">Гравці роблять таємні ставки на телефонах.</p>${hostPlayersHTML(state.players)}<div class="finalList">${state.players.map(p=>`<div class="finalItem"><span>${GameUI.esc(p.name)}</span><b>${p.hasBet?'✅ ставка є':'⏳ чекаємо'}</b></div>`).join('')}</div><button class="btn gold" id="startFinal">Показати фінальне питання</button>`}
- else if(state.phase==='final_ready'){h=`<h2>Фінал — питання відкрите</h2><div class="question">${GameUI.esc(state.current.q)}</div><p class="center muted">Прочитайте запитання вголос. Таймер ще не запущено, поля відповіді на телефонах закриті.</p><div class="row" style="justify-content:center"><button class="btn gold" id="startFinalTimer">▶ Запустити 30 секунд</button></div>${hostPlayersHTML(state.players)}`}
- else if(state.phase==='final_question'){h=`<h2>Фінал • ${Number(state.finalSeconds)>0?`<span id="finalSeconds">${state.finalSeconds}</span> с`:'Отримання результатів'}</h2><div class="question">${GameUI.esc(state.current.q)}</div><div class="finalList">${state.players.map(p=>`<div class="finalItem"><span>${GameUI.esc(p.name)}</span><b>${p.hasFinalAnswer?'✅ відповідь надіслана':'⏳'}</b></div>`).join('')}</div>${Number(state.finalSeconds)>0?'<button class="btn secondary" id="finishFinal">Завершити зараз</button>':''}`}
- else if(state.phase==='final_review'){h=`<h2>Перевірка фіналу</h2><div class="answer"><b>Правильна відповідь:</b> ${GameUI.esc(state.current.a)}</div><div class="finalList">${state.players.map(p=>`<div class="finalItem"><div><b>${GameUI.esc(p.name)}</b><div class="muted">Відповідь: ${GameUI.esc(p.finalAnswer||'—')}</div></div><label><input type="checkbox" class="finalCorrect" data-id="${p.id}" style="width:auto"> правильно</label></div>`).join('')}</div><button class="btn gold" id="scoreFinal">Порахувати результат</button>`}
- else if(state.phase==='final_result'){
-   const total=state.finalResults?.length||0, shown=state.finalRevealCount||0;
-   const nextIndex=total-1-shown, nextPlace=nextIndex>=0?nextIndex+1:null;
-   h=`<h2>🏆 Фінальна церемонія</h2><div class="row" style="justify-content:center;gap:10px;flex-wrap:wrap;margin:14px 0"><button class="btn gold" id="startResultsMusic">🎵 Музика результатів</button><button class="btn gold" id="startWinnerMusic">🏆 Музика переможця</button><button class="btn secondary" id="stopFinalMusic">■ Стоп музика</button></div><div class="row" style="justify-content:center;align-items:center;gap:10px;margin:10px 0"><label for="finalMusicVolume">🔊 Гучність музики ведучого</label><input id="finalMusicVolume" type="range" min="0" max="100" step="1" value="35" style="width:160px"><output id="finalMusicVolumeValue">35%</output></div><p class="muted center">На OBS результати відкриваються від останнього місця до переможця.</p><div class="row" style="justify-content:center;margin:18px 0">${shown<total?`<button class="btn gold" id="revealNextFinal">🎬 ВІДКРИТИ ${nextPlace} МІСЦЕ</button>`:'<div class="winner" style="font-size:26px">🏆 Усі результати відкрито</div>'}</div>${state.finalResults.map((p,i)=>`<div class="finalItem"><span>${i+1}. ${GameUI.esc(p.name)}</span><span>Відповідь: <b>${GameUI.esc(p.finalAnswer||'—')}</b> • ${p.correct?'✅':'❌'} • ставка ${p.bet} • <b>${p.score}</b></span></div>`).join('')}<div class="row" style="justify-content:center;margin-top:22px"><button class="btn" id="restartSame">🔄 Нова гра з цими гравцями</button><button class="btn secondary" id="backMenu">🏠 Головне меню</button></div>`}
- h+=seasonSaveHTML(); h+=seasonCeremonyHTML(); if(state.phase==='lobby')h+=`<details class="panel" style="margin-top:20px;border:1px dashed #8d70d8"><summary style="cursor:pointer;font-weight:800">🧪 Тестування</summary><div class="center" style="margin-top:14px"><p class="muted">Перейти одразу до тестових фінальних результатів без проходження всієї гри.</p><button class="btn secondary" id="testGrandFinal">🧪 ТЕСТ GRAND FINAL</button></div></details>`; h+=seasonManagerHTML(); h+=hostControlsHTML(); const mediaSnapshot=captureMediaPlayback(); stopDetachedMedia(mediaSnapshot); app.innerHTML=h+voiceControlsHTML(); restoreMediaPlayback(mediaSnapshot); bindHostMediaControls(); bind(); armFirstTurnClock(); armNumericClock(); armAudienceClock(); loadSeasonSaveArea(); limitMediaPreview();resumeVideoResult(); }
-function bind(){const $=id=>document.getElementById(id); if($('testGrandFinal'))$('testGrandFinal').onclick=()=>{if(!confirm('Перейти одразу до тестового Grand Final? Поточний стан гри буде замінено тестовими результатами.'))return;emit('testGrandFinal',{},r=>{if(!r?.ok)alert(r?.error||'Помилка тесту')})}; if($('startSeasonCeremony'))$('startSeasonCeremony').onclick=()=>emit('startSeasonCeremony',{},r=>{if(!r?.ok)alert(r?.error||'Помилка')}); if($('revealNextSeason'))$('revealNextSeason').onclick=()=>emit('revealNextSeasonResult',{},r=>{if(!r?.ok)alert(r?.error||'Помилка')}); if($('closeSeasonCeremony'))$('closeSeasonCeremony').onclick=()=>emit('closeSeasonCeremony',{},r=>{if(!r?.ok)alert(r?.error||'Помилка')}); if($('finishVideoResult'))$('finishVideoResult').onclick=()=>emit('finishVideoResult'); if($('continueVideo'))$('continueVideo').onclick=()=>emit('continueVideo',{},r=>{if(!r?.ok)alert(r?.error||'Помилка відео')}); if($('revealAudioStep'))$('revealAudioStep').onclick=()=>emit('revealAudioStep',{},r=>{if(!r?.ok)alert(r?.error||'Помилка аудіо')}); if($('start'))$('start').onclick=()=>emit('startGame',{},r=>{if(r?.ok&&r.specialCells){hostSpecialCells=r.specialCells;if(data&&state&&state.phase==='board')render()}else if(r?.ok===false)alert(r.error||'Не вдалося почати гру')}); if($('startNumericTimer'))$('startNumericTimer').onclick=()=>emit('startNumericTimer',{},r=>{if(r&&r.ok===false)alert(r.error)}); if($('audience1'))$('audience1').onclick=()=>emit('openAudienceRound',{roundIndex:0},r=>{if(r&&r.ok===false)alert(r.error)}); if($('audience2'))$('audience2').onclick=()=>emit('openAudienceRound',{roundIndex:1},r=>{if(r&&r.ok===false)alert(r.error)}); if($('startAudienceQuestion'))$('startAudienceQuestion').onclick=()=>emit('startAudienceQuestion',{},r=>{if(r&&r.ok===false)alert(r.error)}); if($('finishAudienceQuestion'))$('finishAudienceQuestion').onclick=()=>emit('finishAudienceQuestion'); if($('finishAudienceRound'))$('finishAudienceRound').onclick=()=>emit('finishAudienceRound',{},r=>{if(r&&r.ok===false)alert(r.error)}); if($('revealNextAudience'))$('revealNextAudience').onclick=()=>emit('revealNextAudience'); if($('closeAudienceRound'))$('closeAudienceRound').onclick=()=>emit('closeAudienceRound'); if($('startFirstTimer'))$('startFirstTimer').onclick=()=>emit('startFirstTurnTimer',{},r=>{if(r&&r.ok===false)alert(r.error)}); if($('skipFirst'))$('skipFirst').onclick=()=>emit('skipFirstTurnQuiz',{},r=>{if(r&&r.ok===false)alert(r.error)}); if($('revealFirst'))$('revealFirst').onclick=()=>emit('revealFirstTurnResults',{},r=>{if(r&&r.ok===false)alert(r.error)}); if($('revealNextFirst'))$('revealNextFirst').onclick=()=>emit('revealNextFirstTurnResult',{},r=>{if(r&&r.ok===false)alert(r.error)}); if($('beginRoundOne'))$('beginRoundOne').onclick=()=>emit('beginRoundOne',{},r=>{if(r&&r.ok===false)alert(r.error)}); if($('finishNumeric'))$('finishNumeric').onclick=()=>emit('finishNumericQuestion',{},r=>{if(r&&r.ok===false)alert(r.error)}); if($('revealNextNumeric'))$('revealNextNumeric').onclick=()=>emit('revealNextNumeric'); if($('finishNumericResult'))$('finishNumericResult').onclick=()=>emit('finishNumericResult',{},r=>{if(r&&r.ok===false)alert(r.error)}); if($('restartSame'))$('restartSame').onclick=()=>{if(confirm('Почати нову гру з цими гравцями? Фінальні результати цієї гри зникнуть. Якщо ще не зберегли їх у сезон — спочатку збережіть.'))emit('restartSameGame')}; if($('backMenu'))$('backMenu').onclick=()=>{if(confirm('Закрити кімнату й повернутися до головного меню?'))emit('returnToGameMenu')}; if($('newRoom'))$('newRoom').onclick=()=>{if(!confirm('Закрити поточну кімнату й повернутися до вибору гри?'))return;emit('returnToGameMenu',{},()=>{})}; if($('nextRound'))$('nextRound').onclick=()=>{if(confirm('Перейти до Раунду 2? Повернутися до Раунду 1 вже не вийде.'))emit('nextRound')}; if($('finalBets'))$('finalBets').onclick=()=>{if(confirm('Почати фінал? Повернутися до дошки вже не вийде.'))emit('startFinalBets')}; if($('gong'))$('gong').onclick=()=>emit('playCue',{type:'gong'}); if($('finalMusicVolume')){const v=$('finalMusicVolume');v.value=localStorage.getItem('sgFinalMusicVolume')??'35';setHostFinalVolume(v.value);v.oninput=()=>setHostFinalVolume(v.value);} if($('startResultsMusic'))$('startResultsMusic').onclick=()=>emit('playCue',{type:'results_theme'}); if($('startWinnerMusic'))$('startWinnerMusic').onclick=()=>emit('playCue',{type:'winner_theme'}); if($('stopFinalMusic'))$('stopFinalMusic').onclick=()=>emit('playCue',{type:'final_music_stop'}); if($('revealImageStep'))$('revealImageStep').onclick=()=>emit('revealImageStep',{},r=>{if(r&&r.ok===false)alert(r.error)}); if($('tripletCorrect'))$('tripletCorrect').onclick=()=>emit('judgeTriplet',{correct:true},r=>{if(r&&r.ok===false)alert(r.error)}); if($('tripletWrong'))$('tripletWrong').onclick=()=>emit('judgeTriplet',{correct:false},r=>{if(r&&r.ok===false)alert(r.error)}); if($('nextTriplet'))$('nextTriplet').onclick=()=>emit('nextTriplet',{},r=>{if(r&&r.ok===false)alert(r.error)}); if($('openBuzz'))$('openBuzz').onclick=()=>emit('openBuzz'); if($('reveal'))$('reveal').onclick=()=>emit('revealAnswer'); if($('correct'))$('correct').onclick=()=>emit('judge',{correct:true}); if($('sponsorCorrect'))$('sponsorCorrect').onclick=()=>emit('judge',{correct:true,sponsorBonus:true}); if($('wrong'))$('wrong').onclick=()=>emit('judge',{correct:false}); if($('vbCorrect'))$('vbCorrect').onclick=()=>emit('judgeVaBank',{correct:true}); if($('vbWrong'))$('vbWrong').onclick=()=>emit('judgeVaBank',{correct:false}); if($('openDuelBuzz'))$('openDuelBuzz').onclick=()=>emit('openDuelBuzz'); if($('catCorrect'))$('catCorrect').onclick=()=>emit('judgeCat',{correct:true}); if($('catWrong'))$('catWrong').onclick=()=>emit('judgeCat',{correct:false}); if($('playMurlocAnswer'))$('playMurlocAnswer').onclick=()=>emit('playCue',{type:'murloc_answer'},r=>{if(r?.ok===false)alert(r.error||'Не вдалося запустити звук')}); if($('nextResult'))$('nextResult').onclick=()=>emit('nextFromResult'); if($('startFinal'))$('startFinal').onclick=()=>emit('startFinalQuestion',{},r=>{if(!r.ok)alert(r.error)}); if($('startFinalTimer'))$('startFinalTimer').onclick=()=>emit('startFinalTimer',{},r=>{if(r&&r.ok===false)alert(r.error||'Не вдалося запустити таймер')}); if($('finishFinal'))$('finishFinal').onclick=()=>emit('finishFinalNow'); if($('scoreFinal'))$('scoreFinal').onclick=()=>emit('scoreFinal',{results:[...document.querySelectorAll('.finalCorrect')].map(x=>({playerId:x.dataset.id,correct:x.checked}))}); if($('revealNextFinal'))$('revealNextFinal').onclick=()=>emit('revealNextFinalResult',{},r=>{if(r&&r.ok===false)alert(r.error)}); // Pointer-down survives frequent board rerenders from network/voice updates.
- // A single in-flight request prevents duplicate choices while waiting for the server.
- document.querySelectorAll('.tile').forEach(b=>{
-   const choose=()=>{
-     if(b.disabled || window.__tileChoicePending || !socket.connected)return;
-     window.__tileChoicePending=true;
-     b.disabled=true;
-     const timeout=setTimeout(()=>{window.__tileChoicePending=false;if(b.isConnected&&state?.phase==='board')b.disabled=false;},5000);
-     emit('chooseTile',{ci:+b.dataset.ci,qi:+b.dataset.qi},r=>{
-       clearTimeout(timeout);
-       window.__tileChoicePending=false;
-       if(!r?.ok){if(b.isConnected&&state?.phase==='board')b.disabled=false;alert(r?.error||'Не вдалося відкрити питання.');}
-     });
-   };
-   b.addEventListener('pointerdown',e=>{if(e.button!==0)return;e.preventDefault();choose();});
-   b.addEventListener('click',e=>{if(e.detail===0)choose();});
- }); document.querySelectorAll('.catpick').forEach(b=>b.onclick=()=>emit('selectCatReceiver',{playerId:b.dataset.id}));
- document.querySelectorAll('.scoreQuick').forEach(b=>b.onclick=()=>emit('adjustScore',{playerId:b.dataset.id,amount:+b.dataset.v},r=>{if(r&&r.ok===false)alert(r.error)}));
- document.querySelectorAll('.scoreCustom').forEach(b=>b.onclick=()=>{
-   const input=document.querySelector(`.scoreCustomInput[data-id="${b.dataset.id}"]`);
-   const amount=Number(input?.value);
-   if(!Number.isInteger(amount)||amount===0){alert('Введіть ціле число зі знаком, наприклад +250 або -250.');return}
-   emit('adjustScore',{playerId:b.dataset.id,amount},r=>{if(r&&r.ok===false)alert(r.error)});
- });
- const voicePanel=$('voicePanel');
- if(voicePanel)voicePanel.addEventListener('toggle',()=>{voicePanelOpen=voicePanel.open});
- if($('voiceToggle'))$('voiceToggle').onclick=()=>emit('voiceSetEnabled',{enabled:voiceBotStatus!=='connected'},r=>{if(!r?.ok)alert(r?.error||'Не вдалося змінити стан Discord Active Speaker');else{voiceBotStatus=r.status||voiceBotStatus;render()}});
- if(voiceBotStatus==='unknown')emit('voiceGetStatus',{},r=>{if(r?.ok){voiceBotStatus=r.status||'unavailable';voiceBotError=r.error||'';render()}});
- document.querySelectorAll('.voiceId').forEach(input=>input.addEventListener('input',()=>{voiceDraftIds[input.dataset.id]=input.value}));
- document.querySelectorAll('.voiceTest').forEach(input=>input.addEventListener('change',()=>{
-   const id=input.dataset.id;
-   voiceTestIds=input.checked?[...new Set([...voiceTestIds,id])]:voiceTestIds.filter(x=>x!==id);
- }));
- document.querySelectorAll('.voiceSave').forEach(b=>b.onclick=()=>{
- const input=document.querySelector('.voiceId[data-id="'+b.dataset.id+'"]');
- emit('voiceSetMapping',{playerId:b.dataset.id,discordId:input?.value||''},r=>{if(!r?.ok)alert(r?.error||'Помилка прив’язки');else delete voiceDraftIds[b.dataset.id]});
-});
-if($('voiceApply'))$('voiceApply').onclick=()=>emit('voiceTestSpeaking',{playerIds:voiceTestIds.filter(id=>state.players.some(p=>p.id===id))},r=>{if(!r?.ok)alert(r?.error||'Помилка тесту')});
-if($('voiceClear'))$('voiceClear').onclick=()=>{voiceTestIds=[];emit('voiceTestSpeaking',{playerIds:[]});};
-if($('pauseGame'))$('pauseGame').onclick=()=>emit('togglePause',{},r=>{if(r&&r.ok===false)alert(r.error)});
- if($('emergencyBuzz'))$('emergencyBuzz').onclick=()=>emit('emergencyReopenBuzz',{},r=>{if(r&&r.ok===false)alert(r.error)});
- if($('emergencyReveal'))$('emergencyReveal').onclick=()=>emit('emergencyRevealQuestion',{},r=>{if(r&&r.ok===false)alert(r.error)});
- if($('emergencyBoard'))$('emergencyBoard').onclick=()=>{
-   if(!confirm('Закрити поточне питання та повернутися на дошку?'))return;
-   emit('emergencyFinishTile',{},r=>{if(r&&r.ok===false)alert(r.error)});
- };
- if($('stopGame'))$('stopGame').onclick=()=>{
-   if(!confirm('Завершити поточну гру? Кімната закриється для всіх гравців та OBS.'))return;
-   emit('closeRoom',{},r=>{if(r&&r.ok===false)alert(r.error)});
- };
-}
-</script></body></html>
+     <button class="btn gold" id="revealNextFirst" ${revealed >= total ? "disabled" : ""}>${nextLabel}</button>
+     <button class="btn" id="beginRoundOne" ${revealed < total ? "disabled" : ""}>▶ ПОЧАТИ 1 РАУНД</button>
+   </div>`;
+        } else if (state.phase === "numeric_ready") {
+          const n = state.numericChallenge || {};
+          h = `<div class="center"><div class="huge">🔢 30</div><h1>ЧИСЛОВЕ ПИТАННЯ • ${n.value} БАЛІВ</h1><div class="question">${GameUI.esc(n.question || "")}</div><p class="muted">Гравці ще НЕ можуть відповідати.</p><button class="btn gold" id="startNumericTimer">▶ ЗАПУСТИТИ 30 СЕКУНД</button></div>`;
+        } else if (state.phase === "numeric_question") {
+          const n = state.numericChallenge || {},
+            sub = n.submittedPlayerIds || [],
+            left = Math.max(0, Math.ceil(Number(n.remainingMs || 0) / 1000)),
+            all = sub.length === state.players.length;
+          h = `<div class="center"><div class="huge">🔢 <span id="numericTimer">${left}</span></div><h1>ЧИСЛОВЕ ПИТАННЯ • ${n.value} БАЛІВ</h1><div class="question">${GameUI.esc(n.question || "")}</div><p class="muted">Найближча відповідь забирає всі ${n.value} балів. Нічия → хто підтвердив раніше.</p></div><div class="finalList">${state.players.map(p => `<div class="finalItem"><span>${GameUI.esc(p.name)}</span><b>${sub.includes(p.id) ? "✅ відповідь є" : "⏳ думає"}</b></div>`).join("")}</div><div class="row" style="justify-content:center"><button class="btn gold" id="finishNumeric" ${all || left === 0 ? "" : "disabled"}>👁 Відкрити результати</button></div>`;
+        } else if (state.phase === "numeric_result") {
+          const n = state.numericChallenge || {},
+            rs = n.results || [],
+            rev = n.revealCount || 0,
+            total = rs.length,
+            nextIndex = total - 1 - rev;
+          h = `<div class="center"><div class="huge">${n.correctAnswer}</div><h2>ПРАВИЛЬНА ВІДПОВІДЬ</h2></div><div class="finalList">${rs.map((r, i) => `<div class="finalItem"><span><b>${i + 1}. ${GameUI.esc(r.name)}</b></span><span>${r.noAnswer ? "— немає відповіді" : `Відповідь: <b>${r.answer}</b> • різниця: <b>${r.diff}</b>${i === 0 ? " • 🏆 +" + n.value : ""}`}</span></div>`).join("")}</div><div class="row" style="justify-content:center"><button class="btn gold" id="revealNextNumeric" ${rev >= total ? "disabled" : ""}>${rev >= total ? "Усі місця відкриті" : rev === total - 1 ? "🥇 Показати переможця" : `Показати ${nextIndex + 1} місце`}</button><button class="btn" id="finishNumericResult" ${rev < total ? "disabled" : ""}>До дошки</button></div>`;
+        } else if (state.phase === "audience_lobby") {
+          const a = state.audience || {};
+          h = `<div class="center"><div class="huge">👥</div><h1>${GameUI.esc(a.title || "ГРАЮТЬ ГЛЯДАЧІ")}</h1><p>Учасників: <b id="audienceJoined">${a.joined || 0}</b></p><div style="display:flex;gap:18px;justify-content:center;align-items:center;flex-wrap:wrap;margin:18px 0"><img src="/audience-qr/${state.code}" alt="QR" style="width:150px;height:150px;background:#fff;padding:8px;border-radius:16px"><div style="text-align:left"><div class="muted">Посилання для глядачів</div><div style="font-size:20px;font-weight:900;word-break:break-all">${location.origin}/audience/${state.code}</div><div class="muted" style="margin-top:8px">Скануйте QR → введіть нік → приєднуйтесь</div></div></div><button class="btn gold" id="startAudienceQuestion" ${Number(a.joined || 0) < 1 ? "disabled" : ""}>▶ ПИТАННЯ 1/3 • ${Number(data.audienceQuestionSeconds || 15)} СЕК</button>${Number(a.joined || 0) < 1 ? '<p class="muted" id="audienceWaiting">⏳ Чекаємо хоча б одного глядача…</p>' : '<p class="muted" id="audienceWaiting" hidden>⏳ Чекаємо хоча б одного глядача…</p>'}</div>`;
+        } else if (state.phase === "audience_question") {
+          const a = state.audience || {},
+            left = Math.min(
+              Number(a.questionSeconds || data.audienceQuestionSeconds || 15),
+              Math.max(0, Number(a.remainingMs || 0) / 1000),
+            );
+          h = `<div class="center"><div class="huge">👥 <span id="audienceTimer">${left.toFixed(1)}</span></div><h1>ГЛЯДАЧІ • ${a.questionIndex + 1}/${a.totalQuestions}</h1><div class="question">${GameUI.esc(a.question || "")}</div><p>Відповіли: <b id="audienceSubmitted">${a.submitted || 0}/${a.joined || 0}</b></p><button class="btn gold" id="finishAudienceQuestion">📊 ВІДКРИТИ ВІДПОВІДЬ</button></div>`;
+        } else if (state.phase === "audience_result") {
+          const a = state.audience || {},
+            last = a.questionIndex + 1 >= a.totalQuestions;
+          h = `<div class="center"><h1>✅ ${"ABCD"[a.correct]} • ${GameUI.esc(a.options?.[a.correct] || "")}</h1><p>${GameUI.esc(a.fact || "")}</p><div class="finalList">${(a.options || []).map((o, i) => `<div class="finalItem"><span>${"ABCD"[i]} • ${GameUI.esc(o)}</span><b>${a.counts?.[i] || 0}</b></div>`).join("")}</div><button class="btn gold" id="${last ? "finishAudienceRound" : "startAudienceQuestion"}">${last ? "🏆 ПІДСУМКИ" : "▶ НАСТУПНЕ ПИТАННЯ"}</button></div>`;
+        } else if (state.phase === "audience_podium") {
+          const a = state.audience || {},
+            rs = a.ranking || [],
+            rev = a.revealCount || 0,
+            n = Math.min(5, rs.length);
+          h = `<div class="center"><h1>🏆 ${GameUI.esc(a.title || "РЕЗУЛЬТАТИ")}</h1><p>Відкрито: ${rev}/${n}</p><div class="finalList">${rs
+            .slice(0, n)
+            .map(
+              (r, i) =>
+                `<div class="finalItem" style="${i >= n - rev ? "" : "opacity:.15"}"><span><b>${i + 1}. ${GameUI.esc(r.name)}</b></span><span>${r.correct}/3 • ${(r.timeMs / 1000).toFixed(2)} с${i === 0 && a.winner && hostAudienceWinner?.id === r.id ? " • КОД " + GameUI.esc(hostAudienceWinner.code) : ""}</span></div>`,
+            )
+            .join(
+              "",
+            )}</div><div class="row" style="justify-content:center"><button class="btn gold" id="revealNextAudience" ${rev >= n ? "disabled" : ""}>${rev >= n ? "ТОП-5 ВІДКРИТО" : "👁 ВІДКРИТИ НАСТУПНЕ МІСЦЕ"}</button><button class="btn" id="closeAudienceRound" ${rev < n ? "disabled" : ""}>ПОВЕРНУТИСЯ ДО ГРИ</button></div></div>`;
+        } else if (state.phase === "board") {
+          let chooser = state.players.find(p => p.id === state.turnPlayerId);
+          h = `<div class="top"><div><h2>${data.rounds[state.round].name}</h2><div class="muted">🎯 Питання обирає: <b>${GameUI.esc(chooser?.name || "—")}</b></div></div><div class="row">${(data.audienceRounds || []).length >= 2 ? (state.round === 0 ? '<button class="btn gold" id="audience1">👥 Глядачі • Приз №1</button><button class="btn secondary" id="nextRound">Раунд 2</button>' : '<button class="btn gold" id="audience2">👥 Глядачі • Приз №2</button><button class="btn gold" id="finalBets">Фінал</button>') : state.round === 0 ? '<button class="btn secondary" id="nextRound">Раунд 2</button>' : '<button class="btn gold" id="finalBets">Фінал</button>'}</div></div>${state.round === 1 ? '<div class="muted center" style="margin:8px 0 12px">Службові позначки ведучого: 🐈 Кіт у мішку • 🎰 ВА-БАНК • ⚔️ Дуель</div>' : ""}${hostBoardHTML()}${hostPlayersHTML(state.players)}`;
+        } else if (state.phase === "va_bank_bet") {
+          let p = state.players.find(x => x.id === state.vaBankPlayer);
+          h = `<div class="center"><div class="huge">🎰</div><h1>ВА-БАНК!</h1><p class="muted">Ставку на телефоні робить <b>${GameUI.esc(p?.name || "гравець")}</b>.</p></div>${hostPlayersHTML(state.players)}`;
+        } else if (state.phase === "va_bank_question") {
+          let p = state.players.find(x => x.id === state.vaBankPlayer);
+          h = `<div class="center"><div class="huge">🎰 ВА-БАНК • ${state.vaBankBet}</div></div><div class="question">${GameUI.esc(state.current.q)}</div>${emojiQuestionHTML(state.current)}<p class="center muted">Відповідає тільки ${GameUI.esc(p?.name || "гравець")}</p><div class="row" style="justify-content:center"><button class="btn gold" id="gong">🔔 ГОНГ</button><button class="btn good" id="vbCorrect">Правильно +${state.vaBankBet}</button><button class="btn bad" id="vbWrong">Неправильно −${state.vaBankBet}</button></div>${hostPlayersHTML(state.players)}`;
+        } else if (state.phase === "duel_choose") {
+          let p = state.players.find(x => x.id === state.turnPlayerId);
+          h = `<div class="center"><div class="huge">⚔️</div><h1>ДУЕЛЬ!</h1><p class="muted">${GameUI.esc(p?.name || "Гравець")} обирає суперника на телефоні.</p></div>${hostPlayersHTML(state.players)}`;
+        } else if (state.phase === "duel_question") {
+          let names = state.players
+            .filter(p => state.duelPlayers.includes(p.id))
+            .map(p => GameUI.esc(p.name))
+            .join(" VS ");
+          h = `<div class="center"><div class="huge">⚔️ ДУЕЛЬ</div><h2>${names}</h2></div><div class="question">${GameUI.esc(state.current.q)}</div><div class="row" style="justify-content:center"><button class="btn gold" id="gong">🔔 ГОНГ</button><button class="btn" id="openDuelBuzz">✨ ВІДКРИТИ BUZZ ДЛЯ ДУЕЛІ</button></div>${hostPlayersHTML(state.players)}`;
+        } else if (state.phase === "cat_choose") {
+          h = `<h2>🐈 Кіт у мішку</h2><p class="question">${GameUI.esc(state.current.q)}</p><p class="muted center">Оберіть гравця, який відповідатиме.</p><div class="row" style="justify-content:center">${state.players.map(p => `<button class="btn secondary catpick" data-id="${p.id}">${GameUI.esc(p.name)}</button>`).join("")}</div>${hostPlayersHTML(state.players)}`;
+        } else if (state.phase === "triplet_question") {
+          const t = state.current?.triplet || {},
+            p = state.players.find(x => x.id === t.answererId);
+          h = `<div class="center"><div class="huge">🔥 ТРИПЛЕТ</div><h2>Питання ${Number(t.index || 0) + 1}/${t.total || 3} • ${state.current.value} БАЛІВ</h2><p class="muted">Відповідає: <b>${GameUI.esc(p?.name || "—")}</b> • усі 3 питання обов'язкові</p></div><div class="question">${GameUI.esc(state.current.q)}</div><div class="row" style="justify-content:center"><button class="btn gold" id="gong">🔔 ГОНГ</button><button class="btn good" id="tripletCorrect">Правильно +${state.current.value}</button><button class="btn bad" id="tripletWrong">Неправильно −${state.current.value}</button></div>${hostPlayersHTML(state.players)}`;
+        } else if (state.phase === "triplet_result") {
+          const t = state.current?.triplet || {},
+            last = Number(t.index || 0) >= Number(t.total || 3) - 1;
+          h = `<div class="center"><div class="huge">🔥 ТРИПЛЕТ • ${Number(t.index || 0) + 1}/${t.total || 3}</div></div><div class="question">${GameUI.esc(state.current.q)}</div><div class="answer"><b>Правильна відповідь:</b> ${GameUI.esc(state.current.a)}</div><div class="row" style="justify-content:center"><button class="btn gold" id="nextTriplet">${last ? "ЗАВЕРШИТИ ТРИПЛЕТ → ДО ДОШКИ" : "НАСТУПНЕ ПИТАННЯ ТРИПЛЕТА →"}</button></div>${hostPlayersHTML(state.players)}`;
+        } else if (state.phase === "question") {
+          h = `<div class="question">${GameUI.esc(state.current.q)}</div>${emojiQuestionHTML(state.current)}${imageRevealHTML(state.current, true) + mediaQuestionHTML(state.current, true)}<div class="row" style="justify-content:center"><button class="btn gold" id="gong">🔔 ГОНГ</button><button class="btn" id="openBuzz" ${state.players.some(p => p.connected && !p.syncReady) ? 'disabled title="Очікуємо синхронізації гравців"' : ""}>✨ ВІДКРИТИ BUZZ</button><button class="btn secondary" id="reveal">Ніхто не відповів</button></div>${hostPlayersHTML(state.players)}`;
+        } else if (state.phase === "buzz") {
+          let locked = (state.answeringLocked || []).length;
+          h = `<div class="question">${GameUI.esc(state.current.q)}</div>${emojiQuestionHTML(state.current)}${imageRevealHTML(state.current, true) + mediaQuestionHTML(state.current, true)}<div class="center huge">BUZZ!</div><p class="center muted">${locked ? `Уже помилилися: ${locked}. Чекаємо на іншого гравця…` : "Чекаємо на першого гравця…"}</p><div class="row" style="justify-content:center"><button class="btn secondary" id="reveal">Ніхто більше не відповідає</button></div>${hostPlayersHTML(state.players)}`;
+        } else if (state.phase === "answering") {
+          let p = state.players.find(x => x.id === state.buzzer);
+          h = `<div class="question">${GameUI.esc(state.current.q)}</div>${emojiQuestionHTML(state.current)}${imageRevealHTML(state.current, false) + mediaQuestionHTML(state.current, true)}<h2 class="center">Відповідає: ${GameUI.esc(p?.name || "")}</h2><div class="row" style="justify-content:center">${state.current.sponsorDouble ? `<button class="btn good" id="sponsorCorrect">🎙️ Ім’я + озвучка: +${state.current.value * 2}</button>` : ""}<button class="btn good" id="correct">Правильно +${state.current.value}</button><button class="btn bad" id="wrong">Неправильно −${state.current.value}</button></div>${hostPlayersHTML(state.players, state.buzzer)}`;
+        } else if (state.phase === "cat_question") {
+          let p = state.players.find(x => x.id === state.catReceiver);
+          h = `<h2 class="center">🐈 Кіт у мішку — відповідає ${GameUI.esc(p?.name || "")}</h2><div class="question">${GameUI.esc(state.current.q)}</div>${emojiQuestionHTML(state.current)}<div class="row" style="justify-content:center"><button class="btn gold" id="gong">🔔 ГОНГ</button><button class="btn good" id="catCorrect">Правильно +${state.current.value}</button><button class="btn bad" id="catWrong">Неправильно −${state.current.value}</button></div>${hostPlayersHTML(state.players)}`;
+        } else if (state.phase === "result") {
+          let reason =
+            state.resultReason === "all_wrong"
+              ? "Усі гравці відповіли неправильно."
+              : state.resultReason === "no_answer"
+                ? "Ніхто більше не відповідає."
+                : state.resultReason === "correct"
+                  ? "Є правильна відповідь!"
+                  : state.resultReason === "va_bank_wrong"
+                    ? "ВА-БАНК зіграно неправильно."
+                    : "";
+          h = `<div class="question">${GameUI.esc(state.current.q)}</div>${mediaQuestionHTML(state.current, true)}${reason ? `<p class="center muted">${reason}</p>` : ""}<div class="answer"><b>Правильна відповідь:</b> ${GameUI.esc(state.current.a)}</div>${answerMediaHTML(state.current)}${state.current.answerAudio ? `<div class="center"><button class="btn gold" id="playMurlocAnswer">🔊 Відтворити звук мурлока у ведучого та OBS</button></div>` : ""}<div class="row" style="justify-content:center"><button class="btn" id="nextResult">До дошки</button></div>${hostPlayersHTML(state.players)}`;
+        } else if (state.phase === "final_bets") {
+          h = `<h2>Фінал — ставки</h2><p class="muted">Гравці роблять таємні ставки на телефонах.</p>${hostPlayersHTML(state.players)}<div class="finalList">${state.players.map(p => `<div class="finalItem"><span>${GameUI.esc(p.name)}</span><b>${p.hasBet ? "✅ ставка є" : "⏳ чекаємо"}</b></div>`).join("")}</div><button class="btn gold" id="startFinal">Показати фінальне питання</button>`;
+        } else if (state.phase === "final_ready") {
+          h = `<h2>Фінал — питання відкрите</h2><div class="question">${GameUI.esc(state.current.q)}</div><p class="center muted">Прочитайте запитання вголос. Таймер ще не запущено, поля відповіді на телефонах закриті.</p><div class="row" style="justify-content:center"><button class="btn gold" id="startFinalTimer">▶ Запустити 30 секунд</button></div>${hostPlayersHTML(state.players)}`;
+        } else if (state.phase === "final_question") {
+          h = `<h2>Фінал • ${Number(state.finalSeconds) > 0 ? `<span id="finalSeconds">${state.finalSeconds}</span> с` : "Отримання результатів"}</h2><div class="question">${GameUI.esc(state.current.q)}</div><div class="finalList">${state.players.map(p => `<div class="finalItem"><span>${GameUI.esc(p.name)}</span><b>${p.hasFinalAnswer ? "✅ відповідь надіслана" : "⏳"}</b></div>`).join("")}</div>${Number(state.finalSeconds) > 0 ? '<button class="btn secondary" id="finishFinal">Завершити зараз</button>' : ""}`;
+        } else if (state.phase === "final_review") {
+          h = `<h2>Перевірка фіналу</h2><div class="answer"><b>Правильна відповідь:</b> ${GameUI.esc(state.current.a)}</div><div class="finalList">${state.players.map(p => `<div class="finalItem"><div><b>${GameUI.esc(p.name)}</b><div class="muted">Відповідь: ${GameUI.esc(p.finalAnswer || "—")}</div></div><label><input type="checkbox" class="finalCorrect" data-id="${p.id}" style="width:auto"> правильно</label></div>`).join("")}</div><button class="btn gold" id="scoreFinal">Порахувати результат</button>`;
+        } else if (state.phase === "final_result") {
+          const total = state.finalResults?.length || 0,
+            shown = state.finalRevealCount || 0;
+          const nextIndex = total - 1 - shown,
+            nextPlace = nextIndex >= 0 ? nextIndex + 1 : null;
+          h = `<h2>🏆 Фінальна церемонія</h2><div class="row" style="justify-content:center;gap:10px;flex-wrap:wrap;margin:14px 0"><button class="btn gold" id="startResultsMusic">🎵 Музика результатів</button><button class="btn gold" id="startWinnerMusic">🏆 Музика переможця</button><button class="btn secondary" id="stopFinalMusic">■ Стоп музика</button></div><div class="row" style="justify-content:center;align-items:center;gap:10px;margin:10px 0"><label for="finalMusicVolume">🔊 Гучність музики ведучого</label><input id="finalMusicVolume" type="range" min="0" max="100" step="1" value="35" style="width:160px"><output id="finalMusicVolumeValue">35%</output></div><p class="muted center">На OBS результати відкриваються від останнього місця до переможця.</p><div class="row" style="justify-content:center;margin:18px 0">${shown < total ? `<button class="btn gold" id="revealNextFinal">🎬 ВІДКРИТИ ${nextPlace} МІСЦЕ</button>` : '<div class="winner" style="font-size:26px">🏆 Усі результати відкрито</div>'}</div>${state.finalResults.map((p, i) => `<div class="finalItem"><span>${i + 1}. ${GameUI.esc(p.name)}</span><span>Відповідь: <b>${GameUI.esc(p.finalAnswer || "—")}</b> • ${p.correct ? "✅" : "❌"} • ставка ${p.bet} • <b>${p.score}</b></span></div>`).join("")}<div class="row" style="justify-content:center;margin-top:22px"><button class="btn" id="restartSame">🔄 Нова гра з цими гравцями</button><button class="btn secondary" id="backMenu">🏠 Головне меню</button></div>`;
+        }
+        h += seasonSaveHTML();
+        h += seasonCeremonyHTML();
+        if (state.phase === "lobby")
+          h += `<details class="panel" style="margin-top:20px;border:1px dashed #8d70d8"><summary style="cursor:pointer;font-weight:800">🧪 Тестування</summary><div class="center" style="margin-top:14px"><p class="muted">Перейти одразу до тестових фінальних результатів без проходження всієї гри.</p><button class="btn secondary" id="testGrandFinal">🧪 ТЕСТ GRAND FINAL</button></div></details>`;
+        h += seasonManagerHTML();
+        h += hostControlsHTML();
+        const mediaSnapshot = captureMediaPlayback();
+        stopDetachedMedia(mediaSnapshot);
+        app.innerHTML = h + voiceControlsHTML();
+        restoreMediaPlayback(mediaSnapshot);
+        bindHostMediaControls();
+        bind();
+        armFirstTurnClock();
+        armNumericClock();
+        armAudienceClock();
+        loadSeasonSaveArea();
+        limitMediaPreview();
+        resumeVideoResult();
+      }
+      function bind() {
+        const $ = id => document.getElementById(id);
+        if ($("testGrandFinal"))
+          $("testGrandFinal").onclick = () => {
+            if (
+              !confirm(
+                "Перейти одразу до тестового Grand Final? Поточний стан гри буде замінено тестовими результатами.",
+              )
+            )
+              return;
+            emit("testGrandFinal", {}, r => {
+              if (!r?.ok) alert(r?.error || "Помилка тесту");
+            });
+          };
+        if ($("startSeasonCeremony"))
+          $("startSeasonCeremony").onclick = () =>
+            emit("startSeasonCeremony", {}, r => {
+              if (!r?.ok) alert(r?.error || "Помилка");
+            });
+        if ($("revealNextSeason"))
+          $("revealNextSeason").onclick = () =>
+            emit("revealNextSeasonResult", {}, r => {
+              if (!r?.ok) alert(r?.error || "Помилка");
+            });
+        if ($("closeSeasonCeremony"))
+          $("closeSeasonCeremony").onclick = () =>
+            emit("closeSeasonCeremony", {}, r => {
+              if (!r?.ok) alert(r?.error || "Помилка");
+            });
+        if ($("finishVideoResult")) $("finishVideoResult").onclick = () => emit("finishVideoResult");
+        if ($("continueVideo"))
+          $("continueVideo").onclick = () =>
+            emit("continueVideo", {}, r => {
+              if (!r?.ok) alert(r?.error || "Помилка відео");
+            });
+        if ($("revealAudioStep"))
+          $("revealAudioStep").onclick = () =>
+            emit("revealAudioStep", {}, r => {
+              if (!r?.ok) alert(r?.error || "Помилка аудіо");
+            });
+        if ($("start"))
+          $("start").onclick = () =>
+            emit("startGame", {}, r => {
+              if (r?.ok && r.specialCells) {
+                hostSpecialCells = r.specialCells;
+                if (data && state && state.phase === "board") render();
+              } else if (r?.ok === false) alert(r.error || "Не вдалося почати гру");
+            });
+        if ($("startNumericTimer"))
+          $("startNumericTimer").onclick = () =>
+            emit("startNumericTimer", {}, r => {
+              if (r && r.ok === false) alert(r.error);
+            });
+        if ($("audience1"))
+          $("audience1").onclick = () =>
+            emit("openAudienceRound", { roundIndex: 0 }, r => {
+              if (r && r.ok === false) alert(r.error);
+            });
+        if ($("audience2"))
+          $("audience2").onclick = () =>
+            emit("openAudienceRound", { roundIndex: 1 }, r => {
+              if (r && r.ok === false) alert(r.error);
+            });
+        if ($("startAudienceQuestion"))
+          $("startAudienceQuestion").onclick = () =>
+            emit("startAudienceQuestion", {}, r => {
+              if (r && r.ok === false) alert(r.error);
+            });
+        if ($("finishAudienceQuestion")) $("finishAudienceQuestion").onclick = () => emit("finishAudienceQuestion");
+        if ($("finishAudienceRound"))
+          $("finishAudienceRound").onclick = () =>
+            emit("finishAudienceRound", {}, r => {
+              if (r && r.ok === false) alert(r.error);
+            });
+        if ($("revealNextAudience")) $("revealNextAudience").onclick = () => emit("revealNextAudience");
+        if ($("closeAudienceRound")) $("closeAudienceRound").onclick = () => emit("closeAudienceRound");
+        if ($("startFirstTimer"))
+          $("startFirstTimer").onclick = () =>
+            emit("startFirstTurnTimer", {}, r => {
+              if (r && r.ok === false) alert(r.error);
+            });
+        if ($("skipFirst"))
+          $("skipFirst").onclick = () =>
+            emit("skipFirstTurnQuiz", {}, r => {
+              if (r && r.ok === false) alert(r.error);
+            });
+        if ($("revealFirst"))
+          $("revealFirst").onclick = () =>
+            emit("revealFirstTurnResults", {}, r => {
+              if (r && r.ok === false) alert(r.error);
+            });
+        if ($("revealNextFirst"))
+          $("revealNextFirst").onclick = () =>
+            emit("revealNextFirstTurnResult", {}, r => {
+              if (r && r.ok === false) alert(r.error);
+            });
+        if ($("beginRoundOne"))
+          $("beginRoundOne").onclick = () =>
+            emit("beginRoundOne", {}, r => {
+              if (r && r.ok === false) alert(r.error);
+            });
+        if ($("finishNumeric"))
+          $("finishNumeric").onclick = () =>
+            emit("finishNumericQuestion", {}, r => {
+              if (r && r.ok === false) alert(r.error);
+            });
+        if ($("revealNextNumeric")) $("revealNextNumeric").onclick = () => emit("revealNextNumeric");
+        if ($("finishNumericResult"))
+          $("finishNumericResult").onclick = () =>
+            emit("finishNumericResult", {}, r => {
+              if (r && r.ok === false) alert(r.error);
+            });
+        if ($("restartSame"))
+          $("restartSame").onclick = () => {
+            if (
+              confirm(
+                "Почати нову гру з цими гравцями? Фінальні результати цієї гри зникнуть. Якщо ще не зберегли їх у сезон — спочатку збережіть.",
+              )
+            )
+              emit("restartSameGame");
+          };
+        if ($("backMenu"))
+          $("backMenu").onclick = () => {
+            if (confirm("Закрити кімнату й повернутися до головного меню?")) emit("returnToGameMenu");
+          };
+        if ($("newRoom"))
+          $("newRoom").onclick = () => {
+            if (!confirm("Закрити поточну кімнату й повернутися до вибору гри?")) return;
+            emit("returnToGameMenu", {}, () => {});
+          };
+        if ($("nextRound"))
+          $("nextRound").onclick = () => {
+            if (confirm("Перейти до Раунду 2? Повернутися до Раунду 1 вже не вийде.")) emit("nextRound");
+          };
+        if ($("finalBets"))
+          $("finalBets").onclick = () => {
+            if (confirm("Почати фінал? Повернутися до дошки вже не вийде.")) emit("startFinalBets");
+          };
+        if ($("gong")) $("gong").onclick = () => emit("playCue", { type: "gong" });
+        if ($("finalMusicVolume")) {
+          const v = $("finalMusicVolume");
+          v.value = localStorage.getItem("sgFinalMusicVolume") ?? "35";
+          setHostFinalVolume(v.value);
+          v.oninput = () => setHostFinalVolume(v.value);
+        }
+        if ($("startResultsMusic")) $("startResultsMusic").onclick = () => emit("playCue", { type: "results_theme" });
+        if ($("startWinnerMusic")) $("startWinnerMusic").onclick = () => emit("playCue", { type: "winner_theme" });
+        if ($("stopFinalMusic")) $("stopFinalMusic").onclick = () => emit("playCue", { type: "final_music_stop" });
+        if ($("revealImageStep"))
+          $("revealImageStep").onclick = () =>
+            emit("revealImageStep", {}, r => {
+              if (r && r.ok === false) alert(r.error);
+            });
+        if ($("tripletCorrect"))
+          $("tripletCorrect").onclick = () =>
+            emit("judgeTriplet", { correct: true }, r => {
+              if (r && r.ok === false) alert(r.error);
+            });
+        if ($("tripletWrong"))
+          $("tripletWrong").onclick = () =>
+            emit("judgeTriplet", { correct: false }, r => {
+              if (r && r.ok === false) alert(r.error);
+            });
+        if ($("nextTriplet"))
+          $("nextTriplet").onclick = () =>
+            emit("nextTriplet", {}, r => {
+              if (r && r.ok === false) alert(r.error);
+            });
+        if ($("openBuzz")) $("openBuzz").onclick = () => emit("openBuzz");
+        if ($("reveal")) $("reveal").onclick = () => emit("revealAnswer");
+        if ($("correct")) $("correct").onclick = () => emit("judge", { correct: true });
+        if ($("sponsorCorrect"))
+          $("sponsorCorrect").onclick = () => emit("judge", { correct: true, sponsorBonus: true });
+        if ($("wrong")) $("wrong").onclick = () => emit("judge", { correct: false });
+        if ($("vbCorrect")) $("vbCorrect").onclick = () => emit("judgeVaBank", { correct: true });
+        if ($("vbWrong")) $("vbWrong").onclick = () => emit("judgeVaBank", { correct: false });
+        if ($("openDuelBuzz")) $("openDuelBuzz").onclick = () => emit("openDuelBuzz");
+        if ($("catCorrect")) $("catCorrect").onclick = () => emit("judgeCat", { correct: true });
+        if ($("catWrong")) $("catWrong").onclick = () => emit("judgeCat", { correct: false });
+        if ($("playMurlocAnswer"))
+          $("playMurlocAnswer").onclick = () =>
+            emit("playCue", { type: "murloc_answer" }, r => {
+              if (r?.ok === false) alert(r.error || "Не вдалося запустити звук");
+            });
+        if ($("nextResult")) $("nextResult").onclick = () => emit("nextFromResult");
+        if ($("startFinal"))
+          $("startFinal").onclick = () =>
+            emit("startFinalQuestion", {}, r => {
+              if (!r.ok) alert(r.error);
+            });
+        if ($("startFinalTimer"))
+          $("startFinalTimer").onclick = () =>
+            emit("startFinalTimer", {}, r => {
+              if (r && r.ok === false) alert(r.error || "Не вдалося запустити таймер");
+            });
+        if ($("finishFinal")) $("finishFinal").onclick = () => emit("finishFinalNow");
+        if ($("scoreFinal"))
+          $("scoreFinal").onclick = () =>
+            emit("scoreFinal", {
+              results: [...document.querySelectorAll(".finalCorrect")].map(x => ({
+                playerId: x.dataset.id,
+                correct: x.checked,
+              })),
+            });
+        if ($("revealNextFinal"))
+          $("revealNextFinal").onclick = () =>
+            emit("revealNextFinalResult", {}, r => {
+              if (r && r.ok === false) alert(r.error);
+            }); // Pointer-down survives frequent board rerenders from network/voice updates.
+        // A single in-flight request prevents duplicate choices while waiting for the server.
+        document.querySelectorAll(".tile").forEach(b => {
+          const choose = () => {
+            if (b.disabled || window.__tileChoicePending || !socket.connected) return;
+            window.__tileChoicePending = true;
+            b.disabled = true;
+            const timeout = setTimeout(() => {
+              window.__tileChoicePending = false;
+              if (b.isConnected && state?.phase === "board") b.disabled = false;
+            }, 5000);
+            emit("chooseTile", { ci: +b.dataset.ci, qi: +b.dataset.qi }, r => {
+              clearTimeout(timeout);
+              window.__tileChoicePending = false;
+              if (!r?.ok) {
+                if (b.isConnected && state?.phase === "board") b.disabled = false;
+                alert(r?.error || "Не вдалося відкрити питання.");
+              }
+            });
+          };
+          b.addEventListener("pointerdown", e => {
+            if (e.button !== 0) return;
+            e.preventDefault();
+            choose();
+          });
+          b.addEventListener("click", e => {
+            if (e.detail === 0) choose();
+          });
+        });
+        document
+          .querySelectorAll(".catpick")
+          .forEach(b => (b.onclick = () => emit("selectCatReceiver", { playerId: b.dataset.id })));
+        document.querySelectorAll(".scoreQuick").forEach(
+          b =>
+            (b.onclick = () =>
+              emit("adjustScore", { playerId: b.dataset.id, amount: +b.dataset.v }, r => {
+                if (r && r.ok === false) alert(r.error);
+              })),
+        );
+        document.querySelectorAll(".scoreCustom").forEach(
+          b =>
+            (b.onclick = () => {
+              const input = document.querySelector(`.scoreCustomInput[data-id="${b.dataset.id}"]`);
+              const amount = Number(input?.value);
+              if (!Number.isInteger(amount) || amount === 0) {
+                alert("Введіть ціле число зі знаком, наприклад +250 або -250.");
+                return;
+              }
+              emit("adjustScore", { playerId: b.dataset.id, amount }, r => {
+                if (r && r.ok === false) alert(r.error);
+              });
+            }),
+        );
+        const voicePanel = $("voicePanel");
+        if (voicePanel)
+          voicePanel.addEventListener("toggle", () => {
+            voicePanelOpen = voicePanel.open;
+          });
+        if ($("voiceToggle"))
+          $("voiceToggle").onclick = () =>
+            emit("voiceSetEnabled", { enabled: voiceBotStatus !== "connected" }, r => {
+              if (!r?.ok) alert(r?.error || "Не вдалося змінити стан Discord Active Speaker");
+              else {
+                voiceBotStatus = r.status || voiceBotStatus;
+                render();
+              }
+            });
+        if (voiceBotStatus === "unknown")
+          emit("voiceGetStatus", {}, r => {
+            if (r?.ok) {
+              voiceBotStatus = r.status || "unavailable";
+              voiceBotError = r.error || "";
+              render();
+            }
+          });
+        document.querySelectorAll(".voiceId").forEach(input =>
+          input.addEventListener("input", () => {
+            voiceDraftIds[input.dataset.id] = input.value;
+          }),
+        );
+        document.querySelectorAll(".voiceTest").forEach(input =>
+          input.addEventListener("change", () => {
+            const id = input.dataset.id;
+            voiceTestIds = input.checked ? [...new Set([...voiceTestIds, id])] : voiceTestIds.filter(x => x !== id);
+          }),
+        );
+        document.querySelectorAll(".voiceSave").forEach(
+          b =>
+            (b.onclick = () => {
+              const input = document.querySelector('.voiceId[data-id="' + b.dataset.id + '"]');
+              emit("voiceSetMapping", { playerId: b.dataset.id, discordId: input?.value || "" }, r => {
+                if (!r?.ok) alert(r?.error || "Помилка прив’язки");
+                else delete voiceDraftIds[b.dataset.id];
+              });
+            }),
+        );
+        if ($("voiceApply"))
+          $("voiceApply").onclick = () =>
+            emit(
+              "voiceTestSpeaking",
+              { playerIds: voiceTestIds.filter(id => state.players.some(p => p.id === id)) },
+              r => {
+                if (!r?.ok) alert(r?.error || "Помилка тесту");
+              },
+            );
+        if ($("voiceClear"))
+          $("voiceClear").onclick = () => {
+            voiceTestIds = [];
+            emit("voiceTestSpeaking", { playerIds: [] });
+          };
+        if ($("pauseGame"))
+          $("pauseGame").onclick = () =>
+            emit("togglePause", {}, r => {
+              if (r && r.ok === false) alert(r.error);
+            });
+        if ($("emergencyBuzz"))
+          $("emergencyBuzz").onclick = () =>
+            emit("emergencyReopenBuzz", {}, r => {
+              if (r && r.ok === false) alert(r.error);
+            });
+        if ($("emergencyReveal"))
+          $("emergencyReveal").onclick = () =>
+            emit("emergencyRevealQuestion", {}, r => {
+              if (r && r.ok === false) alert(r.error);
+            });
+        if ($("emergencyBoard"))
+          $("emergencyBoard").onclick = () => {
+            if (!confirm("Закрити поточне питання та повернутися на дошку?")) return;
+            emit("emergencyFinishTile", {}, r => {
+              if (r && r.ok === false) alert(r.error);
+            });
+          };
+        if ($("stopGame"))
+          $("stopGame").onclick = () => {
+            if (!confirm("Завершити поточну гру? Кімната закриється для всіх гравців та OBS.")) return;
+            emit("closeRoom", {}, r => {
+              if (r && r.ok === false) alert(r.error);
+            });
+          };
+      }
+    </script>
+  </body>
+</html>
